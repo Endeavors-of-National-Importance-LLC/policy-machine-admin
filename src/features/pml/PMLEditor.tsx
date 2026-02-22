@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Button, Group, Text, Alert, LoadingOverlay } from '@mantine/core';
-import { IconPlayerPlay, IconTrash, IconInfoCircle, IconFileUpload } from '@tabler/icons-react';
+import { IconPlayerPlay, IconTrash, IconInfoCircle, IconFileUpload, IconCopy, IconDownload } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import * as AdjudicationService from '@/shared/api/pdp_adjudication.api';
 import { useTheme } from '@/shared/theme/ThemeContext';
@@ -21,12 +21,13 @@ interface PMLEditorProps {
   onExecute?: (pml: string) => Promise<void> | void;
   readOnly?: boolean;
   hideButtons?: boolean;
+  saveMode?: boolean;
   containerHeight?: number | string;
   autoFocus?: boolean;
 }
 
 
-export function PMLEditor({ title, placeholder, initialValue = '', onChange, onExecute, readOnly = false, hideButtons = false, containerHeight, autoFocus = false }: PMLEditorProps) {
+export function PMLEditor({ title, placeholder, initialValue = '', onChange, onExecute, readOnly = false, hideButtons = false, saveMode = false, containerHeight, autoFocus = false }: PMLEditorProps) {
   const { themeMode } = useTheme();
   const [code, setCode] = useState(initialValue);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -217,6 +218,33 @@ export function PMLEditor({ title, placeholder, initialValue = '', onChange, onE
     fileInputRef.current?.click();
   };
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      notifications.show({
+        title: 'Copied',
+        message: 'PML code copied to clipboard',
+        color: 'green',
+      });
+    } catch {
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to copy to clipboard',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleSaveToFile = () => {
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'draft.pml';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {return;}
@@ -351,14 +379,34 @@ export function PMLEditor({ title, placeholder, initialValue = '', onChange, onE
               >
                 Clear
               </Button>
-              <Button
-                  leftSection={<IconPlayerPlay size={16} />}
-                  onClick={handleSubmit}
-                  loading={isExecuting}
-                  disabled={!code.trim()}
-              >
-                Execute PML
-              </Button>
+              {saveMode ? (
+                <>
+                  <Button
+                      variant="outline"
+                      leftSection={<IconCopy size={16} />}
+                      onClick={handleCopy}
+                      disabled={!code.trim()}
+                  >
+                    Copy
+                  </Button>
+                  <Button
+                      leftSection={<IconDownload size={16} />}
+                      onClick={handleSaveToFile}
+                      disabled={!code.trim()}
+                  >
+                    Save to file
+                  </Button>
+                </>
+              ) : (
+                <Button
+                    leftSection={<IconPlayerPlay size={16} />}
+                    onClick={handleSubmit}
+                    loading={isExecuting}
+                    disabled={!code.trim()}
+                >
+                  Execute PML
+                </Button>
+              )}
             </Group>
         )}
       </div>

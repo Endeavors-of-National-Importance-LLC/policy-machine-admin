@@ -24,7 +24,7 @@ export function transformNode(node: Model.Node): PMNode {
   };
 }
 
-export function createNodeRef(id: string): Model.NodeRef {
+export function createNodeRef(id: bigint): Model.NodeRef {
   return Model.NodeRef.create({ id });
 }
 
@@ -48,8 +48,12 @@ export function argsToValueMap(args: Record<string, any>): Model.ValueMap {
       return Model.Value.create({ stringValue: value });
     }
 
+    if (typeof value === 'bigint') {
+      return Model.Value.create({ int64Value: value });
+    }
+
     if (typeof value === 'number') {
-      return Model.Value.create({ int64Value: value.toString() });
+      return Model.Value.create({ int64Value: BigInt(value) });
     }
 
     if (typeof value === 'boolean') {

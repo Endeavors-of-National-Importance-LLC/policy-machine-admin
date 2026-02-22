@@ -236,7 +236,7 @@ export function Dashboard() {
 		<div
 			style={{
 				height: '100%',
-				width: rightPanelExpanded ? '50%' : '40px',
+				width: rightPanelExpanded ? '60%' : '40px',
 				flexShrink: 0,
 			}}
 		>
@@ -329,7 +329,7 @@ export function Dashboard() {
 						)}
 
 					{/* Delete section */}
-					{rightClickedNode && rightClickedNode.pmId && (
+					{rightClickedNode && rightClickedNode.pmId != null && (
 						<>
 							<Menu.Divider />
 							<Menu.Label>Delete</Menu.Label>

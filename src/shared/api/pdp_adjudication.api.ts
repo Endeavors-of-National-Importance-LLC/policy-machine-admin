@@ -1,30 +1,7 @@
 import * as Model from '@/generated/grpc/v1/model';
 import { AdminAdjudicationServiceClientImpl, ResourceAdjudicationServiceClientImpl } from '@/generated/grpc/v1/pdp_adjudication';
 import * as PdpAdjudication from '@/generated/grpc/v1/pdp_adjudication';
-import {
-  AdminOperationCommand,
-  AssignCmd,
-  AssociateCmd,
-  CreateObjectAttributeCmd,
-  CreateObjectCmd,
-  CreatePolicyClassCmd,
-  CreateNodeProhibitionCmd,
-  CreateProcessProhibitionCmd,
-  CreateUserAttributeCmd,
-  CreateUserCmd,
-  DeassignCmd,
-  DeleteNodeCmd,
-  DeleteObligationCmd,
-  DeleteProhibitionCmd,
-  DissociateCmd,
-  ExecutePMLCmd,
-  SetNodePropertiesCmd,
-  SetResourceAccessRightsCmd,
-  DeleteOperationCmd,
-  DeserializeCmd
-} from '@/generated/grpc/v1/cmd';
-import { NodeRefList } from '@/generated/grpc/v1/model';
-import { rpc, createNodeRef, argsToValueMap } from './pdp.utils';
+import { rpc, argsToValueMap } from './pdp.utils';
 
 const adjudicationClient = new AdminAdjudicationServiceClientImpl(rpc);
 const resourceAdjudicationClient = new ResourceAdjudicationServiceClientImpl(rpc);
@@ -36,7 +13,7 @@ export async function adjudicateOperation(
   args: Record<string, any>
 ): Promise<PdpAdjudication.AdjudicateOperationResponse> {
   const request = PdpAdjudication.OperationRequest.create({
-    opName: operationName,
+    name: operationName,
     args: argsToValueMap(args),
   });
 
@@ -44,13 +21,18 @@ export async function adjudicateOperation(
 }
 
 export async function adjudicateRoutine(
-  commands: AdminOperationCommand[]
+  operations: PdpAdjudication.OperationRequest[]
 ): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
   const request = PdpAdjudication.RoutineRequest.create({
-    commands,
+    operations,
   });
 
   return adjudicationClient.adjudicateRoutine(request);
+}
+
+export async function executePML(pml: string): Promise<PdpAdjudication.ExecutePMLResponse> {
+  const request = PdpAdjudication.ExecutePMLRequest.create({ pml });
+  return adjudicationClient.executePML(request);
 }
 
 export async function adjudicateResourceOperation(
@@ -58,250 +40,119 @@ export async function adjudicateResourceOperation(
   args: Record<string, any>
 ): Promise<PdpAdjudication.AdjudicateOperationResponse> {
   const request = PdpAdjudication.OperationRequest.create({
-    opName: operationName,
+    name: operationName,
     args: argsToValueMap(args),
   });
 
   return resourceAdjudicationClient.adjudicateResourceOperation(request);
 }
 
-// === Node Creation Commands ===
+// === Node Creation Operations ===
 
-export async function createPolicyClass(name: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = CreatePolicyClassCmd.create({ name });
-  const adminCmd = AdminOperationCommand.create({
-    createPolicyClassCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function createPolicyClass(name: string): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('create_policy_class', { name });
 }
 
-export async function createUserAttribute(name: string, descendants: string[] = []): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = CreateUserAttributeCmd.create({
-    name,
-    descendants: descendants.map(createNodeRef),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    createUserAttributeCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function createUserAttribute(name: string, descendants: bigint[] = []): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('create_user_attribute', { name, descendants });
 }
 
-export async function createObjectAttribute(name: string, descendants: string[] = []): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = CreateObjectAttributeCmd.create({
-    name,
-    descendants: descendants.map(createNodeRef),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    createObjectAttributeCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function createObjectAttribute(name: string, descendants: bigint[] = []): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('create_object_attribute', { name, descendants });
 }
 
-export async function createUser(name: string, descendants: string[] = []): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = CreateUserCmd.create({
-    name,
-    descendants: descendants.map(createNodeRef),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    createUserCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function createUser(name: string, descendants: bigint[] = []): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('create_user', { name, descendants });
 }
 
-export async function createObject(name: string, descendants: string[] = []): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = CreateObjectCmd.create({
-    name,
-    descendants: descendants.map(createNodeRef),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    createObjectCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function createObject(name: string, descendants: bigint[] = []): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('create_object', { name, descendants });
 }
 
-// === Node Management Commands ===
+// === Node Management Operations ===
 
-export async function deleteNode(id: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DeleteNodeCmd.create({ node: createNodeRef(id) });
-  const adminCmd = AdminOperationCommand.create({
-    deleteNodeCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function deleteNode(id: bigint): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('delete_node', { id });
 }
 
-export async function setNodeProperties(id: string, properties: Record<string, string>): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = SetNodePropertiesCmd.create({
-    node: createNodeRef(id),
-    properties,
-  });
-  const adminCmd = AdminOperationCommand.create({
-    setNodePropertiesCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function setNodeProperties(id: bigint, properties: Record<string, string>): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('set_node_properties', { id, properties });
 }
 
-// === Assignment Commands ===
+// === Assignment Operations ===
 
-export async function assign(ascendantId: string, descendantIds: string[]): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = AssignCmd.create({
-    ascendant: createNodeRef(ascendantId),
-    descendants: descendantIds.map(createNodeRef),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    assignCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function assign(ascendantId: bigint, descendantIds: bigint[]): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('assign', { ascendant: ascendantId, descendants: descendantIds });
 }
 
-export async function deassign(ascendantId: string, descendantIds: string[]): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DeassignCmd.create({
-    ascendant: createNodeRef(ascendantId),
-    descendants: descendantIds.map(createNodeRef),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    deassignCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function deassign(ascendantId: bigint, descendantIds: bigint[]): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('deassign', { ascendant: ascendantId, descendants: descendantIds });
 }
 
-// === Association Commands ===
+// === Association Operations ===
 
-export async function associate(uaId: string, targetId: string, accessRights: string[]): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = AssociateCmd.create({
-    ua: createNodeRef(uaId),
-    target: createNodeRef(targetId),
-    arset: accessRights,
-  });
-  const adminCmd = AdminOperationCommand.create({
-    associateCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function associate(uaId: bigint, targetId: bigint, accessRights: string[]): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('associate', { ua: uaId, target: targetId, arset: accessRights });
 }
 
-export async function dissociate(uaId: string, targetId: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DissociateCmd.create({
-    ua: createNodeRef(uaId),
-    target: createNodeRef(targetId),
-  });
-  const adminCmd = AdminOperationCommand.create({
-    dissociateCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function dissociate(uaId: bigint, targetId: bigint): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('dissociate', { ua: uaId, target: targetId });
 }
 
-// === PML Commands ===
+// === Resource Access Rights Operations ===
 
-export async function executePML(pml: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = ExecutePMLCmd.create({ pml });
-  const adminCmd = AdminOperationCommand.create({
-    executePmlCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function setResourceAccessRights(accessRights: string[]): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('set_resource_access_rights', { arset: accessRights });
 }
 
-// === Resource Access Rights Commands ===
-
-export async function setResourceAccessRights(accessRights: string[]): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = SetResourceAccessRightsCmd.create({ accessRights });
-  const adminCmd = AdminOperationCommand.create({
-    setResourceOperationsCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function deleteOperation(name: string): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('delete_operation', { name });
 }
 
-export async function deleteAdminOperation(name: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DeleteOperationCmd.create({ name });
-  const adminCmd = AdminOperationCommand.create({
-    deleteAdminOperationCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
-}
-
-export async function deserialize(serialized: string, format: Model.SerializationFormat): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DeserializeCmd.create({ serialized, format });
-  const adminCmd = AdminOperationCommand.create({
-    deserializeCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
-}
-
-// === Prohibition Commands ===
+// === Prohibition Operations ===
 
 export async function createProhibition(
   name: string,
-  subjectNodeId: string | undefined,
+  subjectNodeId: bigint | undefined,
   subjectProcess: string | undefined,
   accessRights: string[],
   isConjunctive: boolean,
-  inclusionSetIds: string[],
-  exclusionSetIds: string[]
-): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const inclusionSet = NodeRefList.create({
-    nodes: inclusionSetIds.map(id => createNodeRef(id))
-  });
-  const exclusionSet = NodeRefList.create({
-    nodes: exclusionSetIds.map(id => createNodeRef(id))
-  });
-
-  let adminCmd: AdminOperationCommand;
-
+  inclusionSetIds: bigint[],
+  exclusionSetIds: bigint[]
+): Promise<PdpAdjudication.AdjudicateOperationResponse> {
   if (subjectProcess) {
-    const cmd = CreateProcessProhibitionCmd.create({
+    return adjudicateOperation('create_process_prohibition', {
       name,
-      node: subjectNodeId ? createNodeRef(subjectNodeId) : undefined,
+      node: subjectNodeId,
       process: subjectProcess,
       arset: accessRights,
-      isConjunctive,
-      inclusionSet,
-      exclusionSet
+      is_conjunctive: isConjunctive,
+      inclusion_set: inclusionSetIds,
+      exclusion_set: exclusionSetIds,
     });
-    adminCmd = AdminOperationCommand.create({ createProcessProhibitionCmd: cmd });
   } else {
-    const cmd = CreateNodeProhibitionCmd.create({
+    return adjudicateOperation('create_node_prohibition', {
       name,
-      node: subjectNodeId ? createNodeRef(subjectNodeId) : undefined,
+      node: subjectNodeId,
       arset: accessRights,
-      isConjunctive,
-      inclusionSet,
-      exclusionSet
+      is_conjunctive: isConjunctive,
+      inclusion_set: inclusionSetIds,
+      exclusion_set: exclusionSetIds,
     });
-    adminCmd = AdminOperationCommand.create({ createNodeProhibitionCmd: cmd });
   }
-
-  return adjudicateRoutine([adminCmd]);
 }
 
-export async function deleteProhibition(name: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DeleteProhibitionCmd.create({ name });
-  const adminCmd = AdminOperationCommand.create({
-    deleteProhibitionCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function deleteProhibition(name: string): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('delete_prohibition', { name });
 }
 
-// === Obligation Commands ===
+// === Obligation Operations ===
 
 export async function createObligation(
   name: string,
-  authorNodeId: string,
+  authorNodeId: bigint,
   pml: string
-): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
+): Promise<PdpAdjudication.ExecutePMLResponse> {
   const obligationPML = `obligation "${name}" {
   author: "${authorNodeId}"
   ${pml}
@@ -310,11 +161,6 @@ export async function createObligation(
   return executePML(obligationPML);
 }
 
-export async function deleteObligation(name: string): Promise<PdpAdjudication.AdjudicateRoutineResponse> {
-  const cmd = DeleteObligationCmd.create({ name });
-  const adminCmd = AdminOperationCommand.create({
-    deleteObligationCmd: cmd,
-  });
-
-  return adjudicateRoutine([adminCmd]);
+export async function deleteObligation(name: string): Promise<PdpAdjudication.AdjudicateOperationResponse> {
+  return adjudicateOperation('delete_obligation', { name });
 }

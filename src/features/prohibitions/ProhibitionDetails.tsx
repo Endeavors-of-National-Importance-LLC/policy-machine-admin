@@ -41,7 +41,7 @@ export function ProhibitionDetails({
   const [isConjunctive, setIsConjunctive] = useState(initialProhibition?.isConjunctive || false);
   const [inclusionSet, setInclusionSet] = useState<TreeNode[]>(
       initialProhibition?.inclusionSet.map(node => ({
-        id: node.id,
+        id: crypto.randomUUID(),
         name: node.name,
         type: node.type as NodeType,
         pmId: node.id
@@ -49,7 +49,7 @@ export function ProhibitionDetails({
   );
   const [exclusionSet, setExclusionSet] = useState<TreeNode[]>(
       initialProhibition?.exclusionSet.map(node => ({
-        id: node.id,
+        id: crypto.randomUUID(),
         name: node.name,
         type: node.type as NodeType,
         pmId: node.id
@@ -74,7 +74,7 @@ export function ProhibitionDetails({
   useEffect(() => {
     if (initialProhibition?.subject?.node) {
       setSubject({
-        id: initialProhibition.subject.node.id,
+        id: crypto.randomUUID(),
         name: initialProhibition.subject.node.name,
         type: initialProhibition.subject.node.type as NodeType,
         pmId: initialProhibition.subject.node.id
@@ -183,7 +183,7 @@ export function ProhibitionDetails({
         name,
         subject: {
           node: {
-            id: subject.pmId || subject.id,
+            id: subject.pmId!,
             name: subject.name,
             type: subject.type as NodeType,
             properties: {}
@@ -192,13 +192,13 @@ export function ProhibitionDetails({
         accessRights: selectedAccessRights,
         isConjunctive,
         inclusionSet: inclusionSet.map(n => ({
-          id: n.pmId || n.id,
+          id: n.pmId!,
           name: n.name,
           type: n.type as NodeType,
           properties: {}
         })),
         exclusionSet: exclusionSet.map(n => ({
-          id: n.pmId || n.id,
+          id: n.pmId!,
           name: n.name,
           type: n.type as NodeType,
           properties: {}
@@ -208,12 +208,12 @@ export function ProhibitionDetails({
       if (!isEditing) {
         await AdjudicationService.createProhibition(
             name,
-            subject.pmId || subject.id,
+            subject.pmId!,
             undefined, // No process support for now
             selectedAccessRights,
             isConjunctive,
-            inclusionSet.map(n => n.pmId || n.id),
-            exclusionSet.map(n => n.pmId || n.id)
+            inclusionSet.map(n => n.pmId!),
+            exclusionSet.map(n => n.pmId!)
         );
         notifications.show({
           color: 'green',
@@ -302,7 +302,7 @@ export function ProhibitionDetails({
                       <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
                         <Text size="xs" c="dimmed" fw={500}>User ID:</Text>
                         <Text size="sm" style={{ flex: 1 }}>
-                          {initialProhibition.subject.node?.id || 'N/A'}
+                          {initialProhibition.subject.node?.id != null ? String(initialProhibition.subject.node.id) : 'N/A'}
                         </Text>
                       </Group>
                     </Group>
@@ -404,7 +404,7 @@ export function ProhibitionDetails({
 
           {/* Conjunctive Checkbox */}
           <Checkbox
-              label="Conjunctive (intersection mode)"
+              label="Conjunctive"
               checked={isConjunctive}
               onChange={(event) => setIsConjunctive(event.currentTarget.checked)}
               disabled={isEditing || isProcessProhibition}

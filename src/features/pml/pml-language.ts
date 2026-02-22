@@ -15,16 +15,13 @@ export const PML_KEYWORDS = {
   nodeTypes: ['node', 'PC', 'OA', 'UA', 'U', 'O', 'pc', 'oa', 'ua', 'u', 'o'],
 
   // Create/delete keywords
-  crud: ['create', 'delete'],
+  crud: ['create', 'delete', 'operation'],
 
   // Conditional delete
   conditionalDelete: ['if exists'],
 
   // Obligation keywords
-  obligation: ['rule', 'when', 'performs', 'on', 'in', 'do', 'any', 'obligation'],
-
-  // Ascendant
-  ascendant: ['ascendant of'],
+  obligation: ['rule', 'when', 'performs', 'on', 'in', 'do', 'any', 'obligation', 'require'],
 
   // Set operations
   setOps: ['intersection', 'inter', 'union'],
@@ -33,7 +30,7 @@ export const PML_KEYWORDS = {
   process: ['process'],
 
   // Resource access rights
-  resourceAccess: ['set resource access rights', 'access rights'],
+  resourceAccess: ['set resource access rights'],
 
   // Assignment keywords
   assignment: ['assign', 'deassign', 'from', 'to'],
@@ -42,7 +39,7 @@ export const PML_KEYWORDS = {
   properties: ['set properties', 'of'],
 
   // Association keywords
-  association: ['associate', 'and', 'with', 'dissociate'],
+  association: ['associate', 'with', 'dissociate'],
 
   // Prohibition/deny
   prohibition: [
@@ -59,9 +56,6 @@ export const PML_KEYWORDS = {
 
   // Variable declaration
   variable: ['var', 'const'],
-
-  // Check statement
-  check: ['check'],
 
   // Data types
   types: ['string', 'bool', 'void', 'array', 'map', 'any', 'int64'],
@@ -84,7 +78,6 @@ export const PML_KEYWORDS_FLAT = [
   ...PML_KEYWORDS.user,
   ...PML_KEYWORDS.control,
   ...PML_KEYWORDS.variable,
-  ...PML_KEYWORDS.check,
   ...PML_KEYWORDS.types,
   ...PML_KEYWORDS.literals,
 ];
@@ -130,10 +123,8 @@ export const PML_MONARCH_LANGUAGE: monaco.languages.IMonarchLanguage = {
     root: [
       // Multi-word keywords (must come before single words)
       [/\bset resource access rights\b/, 'keyword.compound'],
-      [/\baccess rights\b/, 'keyword.compound'],
       [/\bset properties\b/, 'keyword.compound'],
       [/\bif exists\b/, 'keyword.compound'],
-      [/\bascendant of\b/, 'keyword.compound'],
       [/\bany user\b/, 'keyword.compound'],
       [/\bany operation\b/, 'keyword.compound'],
 
@@ -145,10 +136,7 @@ export const PML_MONARCH_LANGUAGE: monaco.languages.IMonarchLanguage = {
       [/\b(adminop|resourceop|routine|function|query)\b/, 'keyword.declaration'],
 
       // CRUD operations
-      [/\b(create|delete)\b/, 'keyword.operation'],
-
-      // Check statement
-      [/\bcheck\b/, 'keyword.check'],
+      [/\b(create|delete|operation)\b/, 'keyword.operation'],
 
       // Assignment/association operations
       [/\b(assign|deassign|associate|dissociate)\b/, 'keyword.operation'],
@@ -157,7 +145,7 @@ export const PML_MONARCH_LANGUAGE: monaco.languages.IMonarchLanguage = {
       [/\b(if|else|foreach|return|break|continue)\b/, 'keyword.control'],
 
       // Obligation keywords
-      [/\b(rule|when|performs|on|in|do|obligation|prohibition)\b/, 'keyword.obligation'],
+      [/\b(rule|when|performs|on|in|do|obligation|prohibition|require)\b/, 'keyword.obligation'],
 
       // Set operations
       [/\b(intersection|inter|union)\b/, 'keyword.setop'],
@@ -262,18 +250,17 @@ export const PML_THEME: monaco.editor.IStandaloneThemeData = {
     { token: 'keyword.datatype', foreground: '0066CC', fontStyle: 'bold' },
     { token: 'keyword.compound', foreground: '0066CC', fontStyle: 'bold' },
     { token: 'keyword.variable', foreground: '0066CC', fontStyle: 'bold' },
-    { token: 'keyword.check', foreground: 'D35400', fontStyle: 'bold' },
     { token: 'keyword.setop', foreground: '8E44AD' },
     { token: 'keyword.deny', foreground: 'C0392B', fontStyle: 'bold' },
     { token: 'keyword.prohibition', foreground: 'C0392B' },
     { token: 'keyword', foreground: '0066CC' },
 
     // Node type keywords with specific colors matching getTypeColor
-    { token: 'keyword.type.pc', foreground: '2b8a3e', fontStyle: 'bold' }, // Green[9] - PC
-    { token: 'keyword.type.ua', foreground: 'e03131', fontStyle: 'bold' }, // Red[6] - UA
-    { token: 'keyword.type.oa', foreground: '228be6', fontStyle: 'bold' }, // Blue[6] - OA
-    { token: 'keyword.type.u', foreground: 'c92a2a', fontStyle: 'bold' },  // Red[8] - U
-    { token: 'keyword.type.o', foreground: '1864ab', fontStyle: 'bold' },  // Blue[8] - O
+    { token: 'keyword.type.pc', foreground: '00973c', fontStyle: 'bold' }, // Green[9] - PC
+    { token: 'keyword.type.ua', foreground: 'e22862', fontStyle: 'bold' }, // Red[6] - UA
+    { token: 'keyword.type.oa', foreground: '0969ff', fontStyle: 'bold' }, // Blue[6] - OA
+    { token: 'keyword.type.u', foreground: 'ec779c', fontStyle: 'bold' },  // Red[8] - U
+    { token: 'keyword.type.o', foreground: '64a0ff', fontStyle: 'bold' },  // Blue[8] - O
 
     // Literals
     { token: 'constant.language', foreground: '008080', fontStyle: 'bold' },

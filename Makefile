@@ -28,7 +28,7 @@ generate:
 	@$(PROTOC) \
 		--plugin="protoc-gen-ts_proto=$(PROTOC_GEN_TS_PROTO)" \
 		--ts_proto_out="$(GENERATED_DIR)" \
-		--ts_proto_opt="esModuleInterop=true,forceLong=string,useOptionals=messages,outputClientImpl=grpc-web" \
+		--ts_proto_opt="esModuleInterop=true,forceLong=bigint,useOptionals=messages,outputClientImpl=grpc-web" \
 		-I $(PROTO_DIR) \
 		$(PROTO_DIR)/**/*.proto
 	@echo "TypeScript files generated in $(GENERATED_DIR)"

@@ -1,25 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    ActionIcon,
     Box,
     Text,
     Group,
     Title,
     Stack,
-    Alert,
-    Loader,
     Center,
-    TextInput,
     Button,
-    NavLink
+    ThemeIcon,
+    Tooltip,
+    UnstyledButton
 } from "@mantine/core";
-import {IconPlus, IconSearch, IconTrash, IconCalendarCode, IconRefresh} from "@tabler/icons-react";
+import {IconTrash, IconCalendarCode, IconUser} from "@tabler/icons-react";
 import { Obligation } from "@/shared/api/pdp.types";
 import * as QueryService from "@/shared/api/pdp_query.api";
 import * as AdjudicationService from "@/shared/api/pdp_adjudication.api";
 import { PMLEditor } from "@/features/pml/PMLEditor";
 import { AuthService } from "@/lib/auth";
 import { notifications } from "@mantine/notifications";
+import { ListDetailPanel } from "@/components/ListDetailPanel";
 
 export function ObligationsPanel() {
     const [obligations, setObligations] = useState<Obligation[]>([]);
@@ -68,7 +67,7 @@ export function ObligationsPanel() {
 
         const extractedName = obligationNameMatch[1];
         const currentUser = AuthService.getUsername();
-        
+
         if (!currentUser) {
             throw new Error('Unable to determine current user');
         }
@@ -80,7 +79,7 @@ export function ObligationsPanel() {
         const newObligation: Obligation = {
             name: extractedName,
             author: {
-                id: currentUser,
+                id: 0n,
                 name: currentUser,
                 type: 'U' as any,
                 properties: {}
@@ -108,7 +107,7 @@ export function ObligationsPanel() {
 
         try {
             await AdjudicationService.deleteObligation(obligationName);
-            
+
             // Remove from local state
             setObligations(prev => prev.filter(o => o.name !== obligationName));
             setSelectedObligation(null);
@@ -147,151 +146,167 @@ export function ObligationsPanel() {
         return obligations.find(o => o.name === selectedObligation) || null;
     }, [obligations, selectedObligation]);
 
-    if (loading) {
-        return (
-            <Center style={{ height: '100%' }}>
-                <Stack align="center" gap="md">
-                    <Loader />
-                    <Text size="sm" c="dimmed">Loading obligations...</Text>
-                </Stack>
-            </Center>
-        );
-    }
+    const listHeader = obligations.length > 0 ? (
+        <Text size="xs" c="dimmed" fw={500} tt="uppercase" px="xs" mb={6}>
+            {filteredObligations.length} of {obligations.length} obligation{obligations.length !== 1 ? 's' : ''}
+        </Text>
+    ) : undefined;
 
-    if (error) {
-        return (
-            <Box p="md">
-                <Alert variant="light" color="red" title="Error loading obligations">
-                    {error}
-                </Alert>
-            </Box>
-        );
-    }
+    const listContent = (
+        <Box p="xs">
+            {obligations.length === 0 && !isCreatingNew ? (
+                <Center py="xl">
+                    <Stack align="center" gap="xs">
+                        <ThemeIcon variant="light" color="gray" size="xl" radius="xl">
+                            <IconCalendarCode size={20} />
+                        </ThemeIcon>
+                        <Text size="sm" c="dimmed">No obligations found</Text>
+                    </Stack>
+                </Center>
+            ) : null}
 
-    return (
-        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
-            <Box p="md" pb="sm">
-                <Group>
-                    <Title order={4}>Obligations</Title>
-                    <Button
-                        variant="filled"
-                        color="var(--mantine-primary-color-filled)"
-                        onClick={handleCreateNew}
-                        disabled={isCreatingNew}
-                        rightSection={<IconPlus size={20} />}
-                    >
-                        Create
-                    </Button>
-                </Group>
-            </Box>
+            {obligations.length > 0 && filteredObligations.length === 0 && filterText.trim() ? (
+                <Center py="lg">
+                    <Text size="sm" c="dimmed">No matches found</Text>
+                </Center>
+            ) : null}
 
-            {/* Content - List and Details side by side */}
-            <Box style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
-                {/* Left Panel - List */}
-                <Box style={{ width: '250px', borderRight: '1px solid var(--mantine-color-default-border)', display: 'flex', flexDirection: 'column' }}>
-                    <Box p="sm">
-                        <Group gap="xs">
-                            <TextInput
-                                placeholder="Filter obligations..."
-                                value={filterText}
-                                onChange={(event) => setFilterText(event.currentTarget.value)}
-                                leftSection={<IconSearch size={16} />}
-                                size="sm"
-                                style={{ flex: 1 }}
-                            />
-                            <ActionIcon
-                                variant="light"
-                                color="var(--mantine-primary-color-filled)"
-                                onClick={fetchObligations}
-                                disabled={loading}
-                            >
-                                <IconRefresh size={20} />
-                            </ActionIcon>
-                        </Group>
-                    </Box>
-
-                    {/* Obligation List */}
-                    <Box style={{ flex: 1, overflowY: 'auto' }}>
-                    {obligations.length === 0 && !isCreatingNew ? (
-                        <Box p="md">
-                            <Text size="sm" c="dimmed">No obligations found.</Text>
-                        </Box>
-                    ) : null}
-
-                    {obligations.length > 0 && filteredObligations.length === 0 && filterText.trim() ? (
-                        <Box p="md">
-                            <Text size="sm" c="dimmed">No matches found.</Text>
-                        </Box>
-                    ) : null}
-
-                    {filteredObligations.map((obligation) => (
-                        <NavLink
+            <Stack gap={4}>
+                {filteredObligations.map((obligation) => {
+                    const isActive = selectedObligation === obligation.name && !isCreatingNew;
+                    return (
+                        <Tooltip
                             key={obligation.name}
                             label={obligation.name}
-                            leftSection={<IconCalendarCode size={16} />}
-                            active={selectedObligation === obligation.name && !isCreatingNew}
+                            position="right"
+                            withArrow
+                            openDelay={400}
+                        >
+                        <UnstyledButton
                             onClick={() => handleSelectObligation(obligation.name)}
-                        />
-                    ))}
-                    </Box>
-                </Box>
-
-                {/* Right Panel - Details */}
-                <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    {isCreatingNew ? (
-                        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '0 10px 10px 10px' }}>
-                            <Group mb="md" justify="space-between">
-                                <Title order={5}>Create New Obligation</Title>
-                                <Button variant="default" size="xs" onClick={() => setIsCreatingNew(false)}>
-                                    Cancel
-                                </Button>
-                            </Group>
-                            <Box style={{ flex: 1, minHeight: 0 }}>
-                                <PMLEditor
-                                    onExecute={handleCreateObligation}
-                                    containerHeight="100%"
-                                    autoFocus
-                                />
-                            </Box>
-                        </Box>
-                    ) : currentObligation ? (
-                        <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            <Group mb="md" justify="space-between">
-                                <Stack gap={0}>
-                                    <Title order={5}>{currentObligation.name}</Title>
-                                    <Text size="sm" c="dimmed">Author: {currentObligation.author?.name || 'Unknown'}</Text>
-                                </Stack>
-                                <Button
-                                    color="red"
-                                    variant="light"
-                                    size="xs"
-                                    leftSection={<IconTrash size={14} />}
-                                    loading={isDeleting === currentObligation.name}
-                                    onClick={() => handleDeleteObligation(currentObligation.name)}
+                            style={{
+                                borderRadius: 'var(--mantine-radius-sm)',
+                                padding: '8px 10px',
+                                backgroundColor: isActive
+                                    ? 'var(--mantine-primary-color-light)'
+                                    : 'transparent',
+                                border: isActive
+                                    ? '1px solid var(--mantine-primary-color-light-color)'
+                                    : '1px solid transparent',
+                                transition: 'background-color 150ms ease, border-color 150ms ease',
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!isActive) {
+                                    e.currentTarget.style.backgroundColor = 'var(--mantine-color-default-hover)';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!isActive) {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                }
+                            }}
+                        >
+                            <Group gap="sm" wrap="nowrap">
+                                <ThemeIcon
+                                    variant={isActive ? 'filled' : 'light'}
+                                    color={isActive ? 'var(--mantine-primary-color-filled)' : 'gray'}
+                                    size="md"
+                                    radius="sm"
                                 >
-                                    Delete
-                                </Button>
+                                    <IconCalendarCode size={14} />
+                                </ThemeIcon>
+                                <Box style={{ flex: 1, minWidth: 0 }}>
+                                    <Text
+                                        size="sm"
+                                        fw={isActive ? 600 : 500}
+                                        truncate
+                                    >
+                                        {obligation.name}
+                                    </Text>
+                                    {obligation.author?.name && (
+                                        <Group gap={4} mt={2}>
+                                            <IconUser size={10} color="var(--mantine-color-dimmed)" />
+                                            <Text size="xs" c="dimmed" truncate>
+                                                {obligation.author.name}
+                                            </Text>
+                                        </Group>
+                                    )}
+                                </Box>
                             </Group>
-                            <Box style={{ flex: 1, minHeight: 0 }}>
-                                <PMLEditor
-                                    initialValue={currentObligation.pml}
-                                    readOnly
-                                    hideButtons
-                                    containerHeight="100%"
-                                />
-                            </Box>
-                        </Box>
-                    ) : (
-                        <Center style={{ height: '100%' }}>
-                            <Stack align="center" gap="xs">
-                                <IconCalendarCode size={48} color="gray" />
-                                <Text c="dimmed" size="sm">Select an obligation to view details</Text>
-                            </Stack>
-                        </Center>
-                    )}
-                </Box>
+                        </UnstyledButton>
+                        </Tooltip>
+                    );
+                })}
+            </Stack>
+        </Box>
+    );
+
+    const detailContent = isCreatingNew ? (
+        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '0 10px 10px 10px' }}>
+            <Group mb="md" justify="space-between">
+                <Title order={5}>Create New Obligation</Title>
+                <Button variant="default" size="xs" onClick={() => setIsCreatingNew(false)}>
+                    Cancel
+                </Button>
+            </Group>
+            <Box style={{ flex: 1, minHeight: 0 }}>
+                <PMLEditor
+                    onExecute={handleCreateObligation}
+                    containerHeight="100%"
+                    autoFocus
+                />
             </Box>
         </Box>
+    ) : currentObligation ? (
+        <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Group mb="md" justify="space-between">
+                <Stack gap={0}>
+                    <Title order={5}>{currentObligation.name}</Title>
+                    <Text size="sm" c="dimmed">Author: {currentObligation.author?.name || 'Unknown'}</Text>
+                </Stack>
+                <Button
+                    color="red"
+                    variant="light"
+                    size="xs"
+                    leftSection={<IconTrash size={14} />}
+                    loading={isDeleting === currentObligation.name}
+                    onClick={() => handleDeleteObligation(currentObligation.name)}
+                >
+                    Delete
+                </Button>
+            </Group>
+            <Box style={{ flex: 1, minHeight: 0 }}>
+                <PMLEditor
+                    initialValue={currentObligation.pml}
+                    readOnly
+                    hideButtons
+                    containerHeight="100%"
+                />
+            </Box>
+        </Box>
+    ) : (
+        <Center style={{ height: '100%' }}>
+            <Stack align="center" gap="xs">
+                <IconCalendarCode size={48} color="gray" />
+                <Text c="dimmed" size="sm">Select an obligation to view details</Text>
+            </Stack>
+        </Center>
+    );
+
+    return (
+        <ListDetailPanel
+            title="Obligations"
+            onCreateClick={handleCreateNew}
+            isCreatingNew={isCreatingNew}
+            filterText={filterText}
+            onFilterChange={setFilterText}
+            onRefresh={fetchObligations}
+            refreshDisabled={loading}
+            listHeader={listHeader}
+            listContent={listContent}
+            detailContent={detailContent}
+            loading={loading}
+            error={error}
+        />
     );
 }

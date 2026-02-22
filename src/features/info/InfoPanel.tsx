@@ -391,7 +391,7 @@ export function InfoPanel(props: InfoPanelProps) {
 					<NodeIcon type={props.rootNode.type} size={40} />
 					<Stack gap={0}>
 						<Text fw={600} size="md" lh={1.2}>{props.rootNode.name}</Text>
-						<Text size="xs" c="dimmed">ID: {props.rootNode.pmId}</Text>
+						<Text size="xs" c="dimmed">ID: {String(props.rootNode.pmId)}</Text>
 					</Stack>
 				</Group>
 				{props.onClose && (

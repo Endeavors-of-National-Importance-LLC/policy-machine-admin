@@ -173,7 +173,7 @@ export const truncateMiddle = (text: string, maxLength: number = 30) => {
 
 export interface TreeNode {
 	id: string; // UUID v4
-	pmId?: string; // Original Node ID from PDP (int64 as string) - optional for temp nodes
+	pmId?: bigint; // Original Node ID from PDP (int64) - optional for temp nodes
 	name: string;
 	type: string;
 	children?: TreeNode[];

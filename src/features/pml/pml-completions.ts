@@ -53,6 +53,13 @@ export function getBasicStatementCompletions(monaco: typeof import('monaco-edito
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       documentation: 'Function definition'
     },
+    {
+      label: 'require',
+      kind: monaco.languages.CompletionItemKind.Keyword,
+      insertText: 'require ["${1:ar}"] on ["${2:target}"]',
+      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+      documentation: 'Require access rights on target'
+    },
   ];
 }
 
@@ -86,13 +93,6 @@ export function getOperationDefinitionCompletions(monaco: typeof import('monaco-
       insertText: 'routine ${1:name}(${2:params}) {\n\t${3}\n}',
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       documentation: 'Routine definition'
-    },
-    {
-      label: 'check',
-      kind: monaco.languages.CompletionItemKind.Keyword,
-      insertText: 'check "${1:accessRight}" on ${2:target}',
-      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      documentation: 'Check access rights on target'
     },
   ];
 }
@@ -173,7 +173,7 @@ export function getAdminStatementCompletions(monaco: typeof import('monaco-edito
     {
       label: 'associate',
       kind: monaco.languages.CompletionItemKind.Function,
-      insertText: 'associate "${1:ua}" and "${2:target}" with ["${3:accessRight}"]',
+      insertText: 'associate "${1:ua}" to "${2:target}" with ["${3:accessRight}"]',
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       documentation: 'Create association with access rights'
     },
@@ -197,6 +197,13 @@ export function getAdminStatementCompletions(monaco: typeof import('monaco-edito
       insertText: 'set resource access rights ["${1:read}", "${2:write}"]',
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       documentation: 'Set resource access rights'
+    },
+    {
+      label: 'delete operation',
+      kind: monaco.languages.CompletionItemKind.Function,
+      insertText: 'delete operation "${1:name}"',
+      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+      documentation: 'Delete operation'
     },
   ];
 }

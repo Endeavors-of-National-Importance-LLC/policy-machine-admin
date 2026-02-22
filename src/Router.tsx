@@ -2,16 +2,12 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { Login } from "@/pages/login/Login";
 import { ProtectedRoute } from "@/ProtectedRoute";
 import {DashboardPage} from "@/pages/dashboard/DashboardPage";
-import {TestPage} from "@/pages/test/TestPage";
+import {PMLEditorPage} from "@/pages/pml/PMLEditorPage";
 
 const router = createBrowserRouter([
   {
     path: '/login',
     element: <Login />,
-  },
-  {
-    path: '/test',
-    element: <TestPage />,
   },
   {
     path: '/',
@@ -24,6 +20,10 @@ const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <DashboardPage />,
+      },
+      {
+        path: 'pml',
+        element: <PMLEditorPage />,
       }
     ],
   },

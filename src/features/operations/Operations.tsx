@@ -7,6 +7,7 @@ import {
   Code, Divider,
   Group,
   Loader,
+  Modal,
   NavLink,
   NumberInput,
   ScrollArea,
@@ -17,9 +18,17 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
+import { ListDetailPanel } from "@/components/ListDetailPanel";
 import { notifications } from "@mantine/notifications";
-import { IconFunction, IconPlus, IconRefresh, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
-import { ParamType, Signature } from "@/shared/api/pdp.types";
+import {
+  IconEdit,
+  IconFunction,
+  IconPlus,
+  IconShieldCog,
+  IconTrash,
+  IconX
+} from "@tabler/icons-react";
+import { ParamType, Signature, OperationType as ProtoOperationType } from "@/shared/api/pdp.types";
 import { Param } from "@/generated/grpc/v1/pdp_query";
 import * as QueryService from "@/shared/api/pdp_query.api";
 import * as AdjudicationService from "@/shared/api/pdp_adjudication.api";
@@ -116,6 +125,11 @@ export function Operations({ initialMode = "admin" }: OperationsProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState<string | null>(null);
   const [filterText, setFilterText] = useState("");
+  const [resourceARModalOpen, setResourceARModalOpen] = useState(false);
+  const [resourceAccessRights, setResourceAccessRights] = useState<string[]>([]);
+  const [resourceARLoading, setResourceARLoading] = useState(false);
+  const [resourceARSaving, setResourceARSaving] = useState(false);
+  const [newAccessRight, setNewAccessRight] = useState("");
 
   // Update mode when initialMode prop changes
   useEffect(() => {
@@ -127,26 +141,17 @@ export function Operations({ initialMode = "admin" }: OperationsProps) {
   const loadSignatures = useCallback(async () => {
     setLoading(true);
     try {
-      let list: Signature[];
-      switch (mode) {
-        case "admin":
-          list = await QueryService.getAdminOperationSignatures();
-          break;
-        case "resource":
-          list = await QueryService.getResourceOperationSignatures();
-          break;
-        case "query":
-          list = await QueryService.getQuerySignatures();
-          break;
-        case "routine":
-          list = await QueryService.getRoutineSignatures();
-          break;
-        case "function":
-          list = await QueryService.getFunctionSignatures();
-          break;
-        default:
-          list = [];
-      }
+      const all = await QueryService.getAllOperationSignatures();
+      const list = all.filter(s => {
+        switch (mode) {
+          case "admin": return s.operationType === ProtoOperationType.ADMIN;
+          case "resource": return s.operationType === ProtoOperationType.RESOURCE;
+          case "query": return s.operationType === ProtoOperationType.QUERY;
+          case "routine": return s.operationType === ProtoOperationType.ROUTINE;
+          case "function": return s.operationType === ProtoOperationType.FUNCTION;
+          default: return false;
+        }
+      });
       setSignatures(list);
     } catch (error) {
       notifications.show({
@@ -190,6 +195,63 @@ export function Operations({ initialMode = "admin" }: OperationsProps) {
     setIsCreatingNew(true);
     setSelectedOperation(null);
   }, []);
+
+  const handleOpenResourceARModal = useCallback(async () => {
+    setResourceARModalOpen(true);
+    setResourceARLoading(true);
+    try {
+      const rights = await QueryService.getResourceAccessRights();
+      setResourceAccessRights(rights);
+    } catch (error) {
+      notifications.show({
+        color: "red",
+        title: "Failed to load resource access rights",
+        message: (error as Error).message,
+      });
+    } finally {
+      setResourceARLoading(false);
+    }
+  }, []);
+
+  const handleAddAccessRight = useCallback(() => {
+    const trimmed = newAccessRight.trim();
+    if (!trimmed) return;
+    if (resourceAccessRights.includes(trimmed)) {
+      notifications.show({
+        color: "yellow",
+        title: "Duplicate",
+        message: `"${trimmed}" already exists.`,
+      });
+      return;
+    }
+    setResourceAccessRights(prev => [...prev, trimmed]);
+    setNewAccessRight("");
+  }, [newAccessRight, resourceAccessRights]);
+
+  const handleRemoveAccessRight = useCallback((right: string) => {
+    setResourceAccessRights(prev => prev.filter(r => r !== right));
+  }, []);
+
+  const handleSaveResourceAccessRights = useCallback(async () => {
+    setResourceARSaving(true);
+    try {
+      await AdjudicationService.setResourceAccessRights(resourceAccessRights);
+      notifications.show({
+        color: "green",
+        title: "Resource Access Rights Updated",
+        message: "Resource access rights have been set successfully.",
+      });
+      setResourceARModalOpen(false);
+    } catch (error) {
+      notifications.show({
+        color: "red",
+        title: "Failed to set resource access rights",
+        message: (error as Error).message,
+      });
+    } finally {
+      setResourceARSaving(false);
+    }
+  }, [resourceAccessRights]);
 
   const handleSelectOperation = useCallback((name: string) => {
     setSelectedOperation(name);
@@ -239,131 +301,177 @@ export function Operations({ initialMode = "admin" }: OperationsProps) {
     return signatures.find(s => s.name === selectedOperation) || null;
   }, [signatures, selectedOperation]);
 
-  if (loading) {
-    return (
-        <Center style={{ height: '100%' }}>
-          <Stack align="center" gap="md">
-            <Loader />
-            <Text size="sm" c="dimmed">Loading {getOperationTypeLabel(mode).toLowerCase()}...</Text>
-          </Stack>
-        </Center>
-    );
-  }
+  const headerButtons = mode === "resource" ? (
+      <Button
+          variant="filled"
+          color="var(--mantine-primary-color-filled)"
+          onClick={handleOpenResourceARModal}
+          leftSection={<IconEdit size={18} />}
+      >
+        Set Resource Access Rights
+      </Button>
+  ) : undefined;
 
-  return (
-      <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <Box p="md" pb="sm">
-          <Group>
-            <Title order={4}>{getOperationTypeLabel(mode)}</Title>
-            <Button
-                variant="filled"
-                color="var(--mantine-primary-color-filled)"
-                onClick={handleCreateNew}
-                disabled={isCreatingNew}
-                rightSection={<IconPlus size={20} />}
-            >
-              Create
-            </Button>
-          </Group>
-        </Box>
-
-        {/* Content - List and Details side by side */}
-        <Box style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
-          {/* Left Panel - List */}
-          <Box style={{ width: '250px', borderRight: '1px solid var(--mantine-color-default-border)', display: 'flex', flexDirection: 'column' }}>
-            <Box p="sm">
-              <Group gap="xs">
-                <TextInput
-                    placeholder={`Filter ${getOperationTypeLabel(mode).toLowerCase()}...`}
-                    value={filterText}
-                    onChange={(event) => setFilterText(event.currentTarget.value)}
-                    leftSection={<IconSearch size={16} />}
-                    size="sm"
-                    style={{ flex: 1 }}
-                />
-                <ActionIcon
-                    variant="light"
-                    color="var(--mantine-primary-color-filled)"
-                    onClick={loadSignatures}
-                    disabled={loading}
-                >
-                  <IconRefresh size={20} />
-                </ActionIcon>
-              </Group>
+  const listContent = (
+      <>
+        {signatures.length === 0 && !isCreatingNew ? (
+            <Box p="md">
+              <Text size="sm" c="dimmed">No {getOperationTypeLabel(mode).toLowerCase()} found.</Text>
             </Box>
+        ) : null}
 
-            {/* Operation List */}
-            <Box style={{ flex: 1, overflowY: 'auto' }}>
-              {signatures.length === 0 && !isCreatingNew ? (
-                  <Box p="md">
-                    <Text size="sm" c="dimmed">No {getOperationTypeLabel(mode).toLowerCase()} found.</Text>
-                  </Box>
-              ) : null}
-
-              {signatures.length > 0 && filteredSignatures.length === 0 && filterText.trim() ? (
-                  <Box p="md">
-                    <Text size="sm" c="dimmed">No matches found.</Text>
-                  </Box>
-              ) : null}
-
-              {filteredSignatures.map((signature) => (
-                  <NavLink
-                      key={signature.name}
-                      label={signature.name || "(unnamed)"}
-                      leftSection={getOperationIcon(mode)}
-                      active={selectedOperation === signature.name && !isCreatingNew}
-                      onClick={() => handleSelectOperation(signature.name || "")}
-                  />
-              ))}
+        {signatures.length > 0 && filteredSignatures.length === 0 && filterText.trim() ? (
+            <Box p="md">
+              <Text size="sm" c="dimmed">No matches found.</Text>
             </Box>
-          </Box>
+        ) : null}
 
-          {/* Right Panel - Details */}
-          <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {isCreatingNew ? (
-                <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '0 10px 10px 10px' }}>
-                  <Group mb="md" justify="space-between">
-                    <Title order={5}>Create New {getOperationTypeLabel(mode).slice(0, -1)}</Title>
-                    <Button variant="default" size="xs" onClick={() => setIsCreatingNew(false)}>
-                      Cancel
-                    </Button>
-                  </Group>
-                  <Box style={{ flex: 1, minHeight: 0 }}>
-                    <PMLEditor
-                        onExecute={handleCreateOperation}
-                        containerHeight="100%"
-                        autoFocus
-                    />
-                  </Box>
-                </Box>
-            ) : currentSignature ? (
-                <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <Group mb="md">
-                    {getOperationIcon(mode, 24)}
-                    <Title order={5}>{currentSignature.name}</Title>
-                  </Group>
-                  <Divider />
-                  <Box style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                    <OperationDetails
-                        signature={currentSignature}
-                        mode={mode}
-                        getOperationTypeLabel={getOperationTypeLabel}
-                        onDelete={handleDeleteSuccess}
-                    />
-                  </Box>
-                </Box>
-            ) : (
-                <Center style={{ height: '100%' }}>
-                  <Stack align="center" gap="xs">
-                    {getOperationIcon(mode, 48, "grey")}
-                    <Text c="dimmed" size="sm">Select an operation to view details</Text>
-                  </Stack>
-                </Center>
-            )}
-          </Box>
+        {filteredSignatures.map((signature) => (
+            <NavLink
+                key={signature.name}
+                label={signature.name || "(unnamed)"}
+                leftSection={getOperationIcon(mode)}
+                active={selectedOperation === signature.name && !isCreatingNew}
+                onClick={() => handleSelectOperation(signature.name || "")}
+            />
+        ))}
+      </>
+  );
+
+  const detailContent = isCreatingNew ? (
+      <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '0 10px 10px 10px' }}>
+        <Group mb="md" justify="space-between">
+          <Title order={5}>Create New {getOperationTypeLabel(mode).slice(0, -1)}</Title>
+          <Button variant="default" size="xs" onClick={() => setIsCreatingNew(false)}>
+            Cancel
+          </Button>
+        </Group>
+        <Box style={{ flex: 1, minHeight: 0 }}>
+          <PMLEditor
+              onExecute={handleCreateOperation}
+              containerHeight="100%"
+              autoFocus
+          />
         </Box>
       </Box>
+  ) : currentSignature ? (
+      <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Group mb="md">
+          {getOperationIcon(mode, 24)}
+          <Title order={5}>{currentSignature.name}</Title>
+        </Group>
+        <Divider />
+        <Box style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <OperationDetails
+              signature={currentSignature}
+              mode={mode}
+              getOperationTypeLabel={getOperationTypeLabel}
+              onDelete={handleDeleteSuccess}
+          />
+        </Box>
+      </Box>
+  ) : (
+      <Center style={{ height: '100%' }}>
+        <Stack align="center" gap="xs">
+          {getOperationIcon(mode, 48, "grey")}
+          <Text c="dimmed" size="sm">Select an operation to view details</Text>
+        </Stack>
+      </Center>
+  );
+
+  return (
+      <>
+        <ListDetailPanel
+            title={getOperationTypeLabel(mode)}
+            onCreateClick={handleCreateNew}
+            isCreatingNew={isCreatingNew}
+            headerButtons={headerButtons}
+            filterText={filterText}
+            onFilterChange={setFilterText}
+            onRefresh={loadSignatures}
+            refreshDisabled={loading}
+            listContent={listContent}
+            detailContent={detailContent}
+            loading={loading}
+        />
+
+        {/* Resource Access Rights Modal */}
+        <Modal
+            opened={resourceARModalOpen}
+            onClose={() => setResourceARModalOpen(false)}
+            title="Resource Access Rights"
+            size="lg"
+        >
+          {resourceARLoading ? (
+              <Center py="xl">
+                <Loader />
+              </Center>
+          ) : (
+              <Stack gap="md">
+                <Group>
+                  <TextInput
+                      placeholder="New access right name"
+                      value={newAccessRight}
+                      onChange={(e) => setNewAccessRight(e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddAccessRight();
+                      }}
+                      style={{ flex: 1 }}
+                  />
+                  <Button
+                      leftSection={<IconPlus size={16} />}
+                      onClick={handleAddAccessRight}
+                      disabled={!newAccessRight.trim()}
+                  >
+                    Add
+                  </Button>
+                </Group>
+
+                <Divider />
+
+                {resourceAccessRights.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" py="md">
+                      No resource access rights defined.
+                    </Text>
+                ) : (
+                    <ScrollArea.Autosize mah={400}>
+                      <Stack gap={0}>
+                        {resourceAccessRights.map((right) => (
+                            <Group key={right} justify="space-between" px="xs" py={2}
+                                   style={{
+                                     borderBottom: '1px solid var(--mantine-color-gray-2)',
+                                   }}
+                            >
+                              <Text size="xs">{right}</Text>
+                              <ActionIcon
+                                  variant="subtle"
+                                  color="red"
+                                  size="sm"
+                                  onClick={() => handleRemoveAccessRight(right)}
+                              >
+                                <IconTrash size={14} />
+                              </ActionIcon>
+                            </Group>
+                        ))}
+                      </Stack>
+                    </ScrollArea.Autosize>
+                )}
+
+                <Group justify="flex-end" mt="md">
+                  <Button variant="default" onClick={() => setResourceARModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                      onClick={handleSaveResourceAccessRights}
+                      loading={resourceARSaving}
+                  >
+                    Set Access Rights
+                  </Button>
+                </Group>
+              </Stack>
+          )}
+        </Modal>
+      </>
   );
 }
 
@@ -467,7 +575,7 @@ function OperationDetails({ signature, mode, getOperationTypeLabel, onDelete }: 
 
     setDeleting(true);
     try {
-      await AdjudicationService.deleteAdminOperation(signature.name);
+      await AdjudicationService.deleteOperation(signature.name);
 
       notifications.show({
         color: "green",

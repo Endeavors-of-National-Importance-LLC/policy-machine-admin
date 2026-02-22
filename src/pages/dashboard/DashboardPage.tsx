@@ -1,8 +1,10 @@
-import {AppShell, Group, Title, useMantineTheme} from "@mantine/core";
+import {AppShell, Button, Group, Title, useMantineTheme} from "@mantine/core";
 import {PMIcon} from "@/components/icons/PMIcon";
 import {UserMenu} from "@/features/user-menu/UserMenu";
 import React from "react";
 import {Dashboard} from "@/pages/dashboard/Dashboard";
+import { Link } from "react-router-dom";
+import { IconCode } from "@tabler/icons-react";
 
 export function DashboardPage() {
 	const mantineTheme = useMantineTheme();
@@ -20,16 +22,6 @@ export function DashboardPage() {
 						<Title order={3}>Policy Machine</Title>
 					</Group>
 					<Group>
-						{/*<Tooltip label={themeMode === 'light' ? "Switch to Dark Mode" : "Switch to Light Mode"}>
-							<ActionIcon
-								variant="subtle"
-								size="md"
-								onClick={toggleTheme}
-							>
-								{themeMode === 'light' ? <IconMoon size={24} /> : <IconSun size={24} />}
-							</ActionIcon>
-						</Tooltip>*/}
-
 						<UserMenu />
 					</Group>
 				</Group>

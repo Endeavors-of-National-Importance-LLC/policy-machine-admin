@@ -11,14 +11,14 @@ export interface FetchChildrenOptions {
   direction: TreeDirection;
   filterConfig: TreeFilterConfig;
   parentNodeId: string;
-  parentPmId: string;
+  parentPmId: bigint;
 }
 
 /**
  * Fetches and transforms regular node children based on direction and filters
  */
 export const fetchNodeChildren = async (
-    parentPmId: string,
+    parentPmId: bigint,
     direction: TreeDirection,
     filterConfig: TreeFilterConfig,
     parentNodeId: string
@@ -51,7 +51,7 @@ export const fetchNodeChildren = async (
  * Fetches association nodes (outgoing and incoming) based on filter config
  */
 export const fetchAssociationChildren = async (
-    parentPmId: string,
+    parentPmId: bigint,
     filterConfig: TreeFilterConfig,
     parentNodeId: string
 ): Promise<TreeNode[]> => {

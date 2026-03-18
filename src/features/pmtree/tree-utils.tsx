@@ -185,6 +185,9 @@ export interface TreeNode {
 	associationDetails?: {
 		type: AssociationDirection
 		accessRightSet: string[]
+
+		ua?: Node
+		target?: Node
 	}
 }
 

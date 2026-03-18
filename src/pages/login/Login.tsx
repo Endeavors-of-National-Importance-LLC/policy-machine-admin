@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { TextInput, Button, Paper, Title, Container, Group, Stack } from '@mantine/core';
 import { PMIcon } from '@/components/icons/PMIcon';
 import { AuthService } from '@/lib/auth';
@@ -56,6 +56,12 @@ export function Login() {
           </Group>
         </form>
       </Paper>
+
+      <Group justify="center" mt="md">
+        <Button component={Link} to="/pml" variant="subtle" size="xs">
+          Open PML Editor
+        </Button>
+      </Group>
     </Container>
   );
 } 

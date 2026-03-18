@@ -76,6 +76,9 @@ export const fetchAssociationChildren = async (
               associationDetails: {
                 type: AssociationDirection.Outgoing,
                 accessRightSet: assoc.accessRights,
+
+                ua: assoc.ua,
+                target: assoc.target,
               },
             });
           }
@@ -103,7 +106,10 @@ export const fetchAssociationChildren = async (
               parent: parentNodeId,
               associationDetails: {
                 type: AssociationDirection.Incoming,
-                accessRightSet: assoc.accessRights
+                accessRightSet: assoc.accessRights,
+
+                ua: assoc.ua,
+                target: assoc.target,
               }
             });
           }

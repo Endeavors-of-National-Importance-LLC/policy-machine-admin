@@ -27,7 +27,7 @@ interface PMLEditorProps {
 }
 
 
-export function PMLEditor({ title, placeholder, initialValue = '', onChange, onExecute, readOnly = false, hideButtons = false, saveMode = false, containerHeight, autoFocus = false }: PMLEditorProps) {
+export function PMLEditor({ placeholder, initialValue = '', onChange, onExecute, readOnly = false, hideButtons = false, saveMode = false, containerHeight, autoFocus = false }: PMLEditorProps) {
   const { themeMode } = useTheme();
   const [code, setCode] = useState(initialValue);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -240,10 +240,24 @@ export function PMLEditor({ title, placeholder, initialValue = '', onChange, onE
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName || 'draft.pml';
+    a.download = `${localTimestamp()}.pml`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  function localTimestamp(d = new Date()): string {
+    const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+    return [
+      d.getFullYear(),
+      pad(d.getMonth() + 1),
+      pad(d.getDate()),
+    ].join("-") + "T" + [
+      pad(d.getHours()),
+      pad(d.getMinutes()),
+      pad(d.getSeconds()),
+    ].join(":");
+  }
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -292,12 +306,6 @@ export function PMLEditor({ title, placeholder, initialValue = '', onChange, onE
   };
   return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: hideButtons ? '0px' : '12px' }}>
-        {!hideButtons && title && (
-            <Text size="lg" fw={600}>
-              {fileName ? `${title} - ${fileName}` : title}
-            </Text>
-        )}
-
         <input
             type="file"
             ref={fileInputRef}

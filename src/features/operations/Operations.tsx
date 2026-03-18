@@ -536,7 +536,9 @@ function OperationDetails({ signature, mode, getOperationTypeLabel, onDelete }: 
 
     setSubmitting(true);
     try {
-      const response = await AdjudicationService.adjudicateOperation(signature.name, args);
+      const response = mode === "resource"
+          ? await AdjudicationService.adjudicateResourceOperation(signature.name, args)
+          : await AdjudicationService.adjudicateOperation(signature.name, args);
 
       // Store return value if present, unwrapping the protobuf Value structure
       if (response?.value !== undefined && response?.value !== null) {

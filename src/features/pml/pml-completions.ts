@@ -316,7 +316,14 @@ export function getAnnotationCompletions(monaco: typeof import('monaco-editor'))
     {
       label: '@reqcap',
       kind: monaco.languages.CompletionItemKind.Property,
-      insertText: `@reqcap({ $\{1:param}: ["$\{2:accessRight}"] })`,
+      insertText: `@reqcap({ \n\n\t })`,
+      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+      documentation: 'Required capability annotation for operation parameters'
+    },
+    {
+      label: '@eventctx',
+      kind: monaco.languages.CompletionItemKind.Property,
+      insertText: `@eventctx()`,
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       documentation: 'Required capability annotation for operation parameters'
     },

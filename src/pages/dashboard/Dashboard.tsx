@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IconBan, IconCopy, IconInfoSquareRounded, IconPlus, IconTrash } from '@tabler/icons-react';
 import { NodeApi } from 'react-arborist';
 import {
@@ -13,12 +13,14 @@ import {
 	useMantineTheme,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { AssociationModal } from '@/features/info/AssociationModal';
 import { InfoPanel } from '@/features/info/InfoPanel';
 import { PMTree, TreeFilterConfig } from '@/features/pmtree';
-import { NodeIcon, TreeNode } from '@/features/pmtree/tree-utils';
+import { AssociationDirection, NodeIcon, TreeNode } from '@/features/pmtree/tree-utils';
 import { RightPanel, RightPanelComponent } from '@/pages/dashboard/RightPanel';
 import { NodeType } from '@/shared/api/pdp.types';
 import * as AdjudicationService from '@/shared/api/pdp_adjudication.api';
+import * as QueryService from '@/shared/api/pdp_query.api';
 
 // PMTree now manages its own atoms internally - no need to create them here!
 
@@ -34,6 +36,15 @@ export function Dashboard() {
 	const [createNodeModalOpened, setCreateNodeModalOpened] = useState(false);
 	const [nodeTypeToCreate, setNodeTypeToCreate] = useState<NodeType | null>(null);
 	const [newNodeName, setNewNodeName] = useState('');
+	const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
+	const [associationModalNode, setAssociationModalNode] = useState<TreeNode | null>(null);
+	const [resourceOperations, setResourceOperations] = useState<string[]>([]);
+
+	useEffect(() => {
+		QueryService.getResourceAccessRights()
+			.then(setResourceOperations)
+			.catch(() => setResourceOperations([]));
+	}, []);
 
 	// Main dashboard tree filter configuration - PMTree now manages this internally
 	const treeFilters: TreeFilterConfig = {
@@ -44,6 +55,12 @@ export function Dashboard() {
 
 	const handleNodeRightClick = (node: TreeNode, event: React.MouseEvent) => {
 		event.preventDefault();
+		if (node.isAssociation) {
+			console.log('[AssocModal] opening modal for node', node);
+			setAssociationModalNode(node);
+			setIsAssociationModalOpen(true);
+			return;
+		}
 		setRightClickedNode(node);
 		setContextMenuPosition({ x: event.clientX, y: event.clientY });
 		setContextMenuOpened(true);
@@ -167,6 +184,49 @@ export function Dashboard() {
 		}
 
 		handleCreateNodeCancel();
+	};
+
+	const handleAssociationModalClose = () => {
+		setIsAssociationModalOpen(false);
+		setAssociationModalNode(null);
+	};
+
+	const handleAssociationModalSubmit = async (selectedNode: TreeNode, accessRights: string[]) => {
+		const details = associationModalNode?.associationDetails;
+		console.log('[AssocModal] submit called', { details, selectedNode, accessRights });
+		const { ua, target } = details ?? {};
+		if (!ua || !target) {
+			console.warn('[AssocModal] submit: ua or target missing', { ua, target });
+			return;
+		}
+		try {
+			await AdjudicationService.dissociate(ua.id, target.id);
+			await AdjudicationService.associate(ua.id, target.id, accessRights);
+			notifications.show({ color: 'green', title: 'Association Updated', message: 'Access rights updated successfully' });
+		} catch (error) {
+			notifications.show({ color: 'red', title: 'Update Error', message: (error as Error).message });
+		}
+		handleAssociationModalClose();
+	};
+
+	const handleAssociationModalDelete = async (assocNode: TreeNode) => {
+		const details = assocNode.associationDetails;
+		console.log('[AssocModal] delete called', { details, assocNode });
+		const { ua, target } = details ?? {};
+		if (!ua || !target) {
+			console.warn('[AssocModal] delete: ua or target missing', { ua, target });
+			return;
+		}
+		try {
+			console.log('[AssocModal] calling dissociate', { uaId: ua.id, targetId: target.id });
+			const result = await AdjudicationService.dissociate(ua.id, target.id);
+			console.log('[AssocModal] dissociate result', result);
+			notifications.show({ color: 'green', title: 'Association Deleted', message: 'Association deleted successfully' });
+		} catch (error) {
+			console.error('[AssocModal] dissociate error', error);
+			notifications.show({ color: 'red', title: 'Delete Error', message: (error as Error).message });
+		}
+		handleAssociationModalClose();
 	};
 
 	const handleComponentClick = (component: RightPanelComponent) => {
@@ -344,6 +404,32 @@ export function Dashboard() {
 					)}
 				</Menu.Dropdown>
 			</Menu>
+
+			{/* Association Modal */}
+			{isAssociationModalOpen && associationModalNode && (() => {
+				const details = associationModalNode.associationDetails;
+				const direction = details?.type ?? AssociationDirection.Incoming;
+				// rootNode is the "other side" not represented by associationNode itself:
+				// outgoing: associationNode holds target info, rootNode = ua (source)
+				// incoming: associationNode holds ua info, rootNode = target
+				const rootPmNode = direction === AssociationDirection.Outgoing ? details?.ua : details?.target;
+				const rootTreeNode = rootPmNode
+					? { id: crypto.randomUUID(), pmId: rootPmNode.id, name: rootPmNode.name, type: rootPmNode.type }
+					: undefined;
+				return (
+					<AssociationModal
+						opened={isAssociationModalOpen}
+						onClose={handleAssociationModalClose}
+						direction={direction}
+						onSubmit={handleAssociationModalSubmit}
+						onDelete={handleAssociationModalDelete}
+						resourceOperations={resourceOperations}
+						mode="edit"
+						associationNode={associationModalNode}
+						rootNode={rootTreeNode}
+					/>
+				);
+			})()}
 
 			{/* Create Node Modal */}
 			<Modal

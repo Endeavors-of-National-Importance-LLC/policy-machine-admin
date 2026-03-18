@@ -9,7 +9,7 @@ export const PML_KEYWORDS = {
   definitions: ['adminop', 'resourceop', 'routine', 'function', 'query'],
 
   // Node argument annotation
-  annotations: ['@node', '@reqcap'],
+  annotations: ['@node', '@reqcap', '@eventctx'],
 
   // Node types
   nodeTypes: ['node', 'PC', 'OA', 'UA', 'U', 'O', 'pc', 'oa', 'ua', 'u', 'o'],
@@ -131,6 +131,7 @@ export const PML_MONARCH_LANGUAGE: monaco.languages.IMonarchLanguage = {
       // Annotations (use @@ to match literal @)
       [/@@node/, 'annotation'],
       [/@@reqcap/, 'annotation'],
+      [/@@eventctx/, 'annotation'],
 
       // Operation definition keywords
       [/\b(adminop|resourceop|routine|function|query)\b/, 'keyword.declaration'],

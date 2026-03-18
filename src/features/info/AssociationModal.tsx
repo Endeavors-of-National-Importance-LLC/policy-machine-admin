@@ -57,6 +57,7 @@ export function AssociationModal({
 	useEffect(() => {
 		if (opened) {
 			if (mode === 'edit' && associationNode) {
+				console.log('[AssocModal] init edit mode', { associationNode, accessRightSet: associationNode.associationDetails?.accessRightSet });
 				// In edit mode, use the association node as the selected node
 				setSelectedNode(associationNode);
 				setSelectedAccessRights(associationNode.associationDetails?.accessRightSet || []);
@@ -90,6 +91,7 @@ export function AssociationModal({
 	);
 
 	const handleSubmit = useCallback(() => {
+		console.log('[AssocModal] handleSubmit', { selectedNode, selectedAccessRights });
 		if (selectedNode && selectedAccessRights.length > 0) {
 			onSubmit(selectedNode, selectedAccessRights);
 			onClose();

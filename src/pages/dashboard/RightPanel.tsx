@@ -1,17 +1,16 @@
-import { ActionIcon, Center, Stack } from "@mantine/core";
-import {
-	IconBan,
-	IconCalendarCode,
-} from "@tabler/icons-react";
-import React from "react";
-import {ProhibitionsPanel, ProhibitionDetails} from "@/features/prohibitions";
-import {ObligationsPanel} from "@/features/obligations/ObligationsPanel";
-import { Operations } from "@/features/operations";
-import {AdminOperationIcon} from "@/components/icons/AdminOperationIcon";
-import {ResourceOperationIcon} from "@/components/icons/ResourceOperationIcon";
-import {QueryOperationIcon} from "@/components/icons/QueryOperationIcon";
-import {RoutineIcon} from "@/components/icons/RoutineIcon";
-import {FunctionIcon} from "@/components/icons/FunctionIcon";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionIcon, Menu, Tooltip } from '@mantine/core';
+import { IconBan, IconCalendarCode, IconDotsVertical, IconX } from '@tabler/icons-react';
+import { ProhibitionDetails, ProhibitionsPanel } from '@/features/prohibitions';
+import { ObligationsPanel } from '@/features/obligations/ObligationsPanel';
+import { Operations } from '@/features/operations';
+import { InfoPanel } from '@/features/info/InfoPanel';
+import { AdminOperationIcon } from '@/components/icons/AdminOperationIcon';
+import { ResourceOperationIcon } from '@/components/icons/ResourceOperationIcon';
+import { QueryOperationIcon } from '@/components/icons/QueryOperationIcon';
+import { RoutineIcon } from '@/components/icons/RoutineIcon';
+import { FunctionIcon } from '@/components/icons/FunctionIcon';
+import { TreeNode } from '@/features/pmtree/tree-utils';
 
 export enum RightPanelComponent {
 	NODE_INFO = 'NODE_INFO',
@@ -25,136 +24,221 @@ export enum RightPanelComponent {
 	FUNCTIONS = 'FUNCTIONS',
 }
 
+export type Tab = {
+	id: string;
+	label: string;
+	icon: React.ReactNode;
+	component: RightPanelComponent | 'NODE_INFO';
+	nodeInfo?: TreeNode;
+	permanent?: boolean;
+};
+
+export type ToolbarEntry = {
+	comp: RightPanelComponent;
+	label: string;
+	tabIcon: React.ReactNode;
+	renderIcon: (active: boolean) => React.ReactNode;
+};
+
+export const TOOLBAR_CONFIG: ToolbarEntry[] = [
+	{
+		comp: RightPanelComponent.PROHIBITIONS,
+		label: 'Prohibitions',
+		tabIcon: <IconBan size={18} />,
+		renderIcon: (active) => (
+			<IconBan size={22} color={active ? 'white' : 'var(--mantine-primary-color-filled)'} />
+		),
+	},
+	{
+		comp: RightPanelComponent.OBLIGATIONS,
+		label: 'Obligations',
+		tabIcon: <IconCalendarCode size={18} />,
+		renderIcon: (active) => (
+			<IconCalendarCode
+				size={22}
+				color={active ? 'white' : 'var(--mantine-primary-color-filled)'}
+			/>
+		),
+	},
+	{
+		comp: RightPanelComponent.ADMIN_OPERATIONS,
+		label: 'Admin Operations',
+		tabIcon: <AdminOperationIcon size={18} />,
+		renderIcon: (active) => (
+			<AdminOperationIcon
+				size={22}
+				filled={active}
+				fillColor="var(--mantine-primary-color-filled)"
+			/>
+		),
+	},
+	{
+		comp: RightPanelComponent.RESOURCE_OPERATIONS,
+		label: 'Resource Operations',
+		tabIcon: <ResourceOperationIcon size={18} />,
+		renderIcon: (active) => (
+			<ResourceOperationIcon
+				size={22}
+				filled={active}
+				fillColor="var(--mantine-primary-color-filled)"
+			/>
+		),
+	},
+	{
+		comp: RightPanelComponent.QUERIES,
+		label: 'Queries',
+		tabIcon: <QueryOperationIcon size={18} />,
+		renderIcon: (active) => (
+			<QueryOperationIcon
+				size={22}
+				filled={active}
+				fillColor="var(--mantine-primary-color-filled)"
+			/>
+		),
+	},
+	{
+		comp: RightPanelComponent.ROUTINES,
+		label: 'Routines',
+		tabIcon: <RoutineIcon size={18} />,
+		renderIcon: (active) => (
+			<RoutineIcon size={22} filled={active} fillColor="var(--mantine-primary-color-filled)" />
+		),
+	},
+	{
+		comp: RightPanelComponent.FUNCTIONS,
+		label: 'Functions',
+		tabIcon: <FunctionIcon size={18} />,
+		renderIcon: (active) => (
+			<FunctionIcon size={22} filled={active} fillColor="var(--mantine-primary-color-filled)" />
+		),
+	},
+];
+
 export type RightPanelProps = {
-	component: RightPanelComponent | null;
-	isExpanded: boolean;
-	onComponentClick: (component: RightPanelComponent) => void;
-	selectedNodeForInfo?: any;
-	selectedNodes?: any[];
-	onRightPanelClose?: () => void;
-}
+	tabs: Tab[];
+	activeTabId: string | null;
+	selectedNodes: TreeNode[];
+	onTabSwitch: (tabId: string) => void;
+	onTabClose: (tabId: string) => void;
+};
 
-export function RightPanel({component, isExpanded, onComponentClick, selectedNodeForInfo, selectedNodes, onRightPanelClose}: RightPanelProps) {
-	const buttons = [
-		{
-			component: RightPanelComponent.PROHIBITIONS,
-			icon: <IconBan size={24}/>,
-			title: "Prohibitions"
-		},
-		{
-			component: RightPanelComponent.OBLIGATIONS,
-			icon: <IconCalendarCode size={24}/>,
-			title: "Obligations"
-		},
-		{
-			component: RightPanelComponent.ADMIN_OPERATIONS,
-			icon: <AdminOperationIcon size={24}/>,
-			title: "Admin Operations"
-		},
-		{
-			component: RightPanelComponent.RESOURCE_OPERATIONS,
-			icon: <ResourceOperationIcon size={24}/>,
-			title: "Resource Operations"
-		},
-		{
-			component: RightPanelComponent.QUERIES,
-			icon: <QueryOperationIcon size={24}/>,
-			title: "Queries"
-		},
-		{
-			component: RightPanelComponent.ROUTINES,
-			icon: <RoutineIcon size={24}/>,
-			title: "Routines"
-		},
-		{
-			component: RightPanelComponent.FUNCTIONS,
-			icon: <FunctionIcon size={24}/>,
-			title: "Functions"
-		}
-	];
-
-	const buttonStack = (
-		<Stack style={{
-			height: "100%",
-			backgroundColor: "var(--mantine-color-gray-0)",
-			padding: "4px",
-			width: "40px",
-			flexShrink: 0,
-			borderLeft: "1px solid var(--mantine-color-gray-3)"
-		}}>
-			{buttons.map(({component: btnComponent, icon, title}) => (
-				<Center key={btnComponent}>
-					<ActionIcon
-						variant={component === btnComponent ? "filled" : "transparent"}
-						size="md"
-						onClick={() => onComponentClick(btnComponent)}
-						title={title}
-					>
-						{React.cloneElement(icon, {
-							color: component === btnComponent ? "white" : "var(--mantine-primary-color-filled)",
-							...(icon.type !== IconBan &&
-								icon.type !== IconCalendarCode && {
-								filled: component === btnComponent,
-								fillColor: "var(--mantine-primary-color-filled)"
-							})
-						})}
-					</ActionIcon>
-				</Center>
-			))}
-		</Stack>
-	);
-
-	if (!isExpanded) {
-		// Collapsed state - just show button stack, ensure no content bleeding
-		return (
-			<div style={{ 
-				display: 'flex', 
-				flexDirection: 'row',
-				height: '100%',
-				width: '40px',
-				overflow: 'hidden'
-			}}>
-				{buttonStack}
-			</div>
-		);
-	}
-
-	// Expanded state - content on left, buttons on right
+function TabItem({
+	tab,
+	isActive,
+	onSwitch,
+	onClose,
+}: {
+	tab: Tab;
+	isActive: boolean;
+	onSwitch: (id: string) => void;
+	onClose: (id: string) => void;
+}) {
 	return (
-		<div style={{ 
-			display: 'flex', 
-			flexDirection: 'row',
-			height: '100%',
-			width: '100%'
-		}}>
-			{/* Content area - takes up remaining space on the left */}
-			<div style={{
-				flex: 1,
-				backgroundColor: "var(--mantine-color-gray-0)",
-				padding: "4px",
-				borderLeft: "3px solid var(--mantine-color-gray-4)",
-				minWidth: 0,
-				overflow: 'hidden'
-			}}>
-				{renderComponent(component, selectedNodeForInfo, selectedNodes as any[], onRightPanelClose)}
-			</div>
-			
-			{/* Button stack - always on the right */}
-			{buttonStack}
+		<Tooltip label={tab.label} position="bottom" openDelay={500} withinPortal>
+		<div
+			onClick={() => onSwitch(tab.id)}
+			style={{
+				width: 160,
+				flexShrink: 0,
+				height: '100%',
+				display: 'flex',
+				alignItems: 'center',
+				paddingLeft: 8,
+				paddingRight: 4,
+				gap: 4,
+				cursor: 'pointer',
+				backgroundColor: isActive ? 'white' : 'var(--mantine-color-gray-1)',
+				borderBottom: isActive
+					? '2px solid var(--mantine-primary-color-filled)'
+					: '2px solid transparent',
+				borderRight: '1px solid var(--mantine-color-gray-3)',
+				userSelect: 'none',
+			}}
+		>
+			{tab.icon && (
+				<span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>{tab.icon}</span>
+			)}
+			<span
+				style={{
+					flex: 1,
+					fontSize: 13,
+					fontWeight: isActive ? 600 : 400,
+					overflow: 'hidden',
+					textOverflow: 'ellipsis',
+					whiteSpace: 'nowrap',
+				}}
+			>
+				{tab.label}
+			</span>
+			{!tab.permanent && (
+				<ActionIcon
+					size="sm"
+					variant="transparent"
+					onClick={(e) => {
+						e.stopPropagation();
+						onClose(tab.id);
+					}}
+					style={{ flexShrink: 0 }}
+				>
+					<IconX size={14} />
+				</ActionIcon>
+			)}
 		</div>
+		</Tooltip>
 	);
 }
 
-function renderComponent(component: RightPanelComponent | null, selectedNodeForInfo: any, selectedNodes: any[], onRightPanelClose?: () => void) {
-	switch (component) {
+function OverflowMenu({
+	tabs,
+	activeTabId,
+	onSwitch,
+}: {
+	tabs: Tab[];
+	activeTabId: string | null;
+	onSwitch: (id: string) => void;
+}) {
+	return (
+		<Menu position="bottom-end" withinPortal>
+			<Menu.Target>
+				<Tooltip label="More tabs" position="bottom">
+					<ActionIcon variant="transparent" size="lg" style={{ flexShrink: 0 }}>
+						<IconDotsVertical size={18} />
+					</ActionIcon>
+				</Tooltip>
+			</Menu.Target>
+			<Menu.Dropdown>
+				{tabs.map((tab) => (
+					<Menu.Item
+						key={tab.id}
+						leftSection={tab.icon}
+						onClick={() => onSwitch(tab.id)}
+						fw={tab.id === activeTabId ? 600 : 400}
+					>
+						{tab.label}
+					</Menu.Item>
+				))}
+			</Menu.Dropdown>
+		</Menu>
+	);
+}
+
+function renderTabContent(
+	tab: Tab,
+	selectedNodes: TreeNode[],
+	onClose: () => void
+): React.ReactNode {
+	if (tab.component === 'NODE_INFO' && tab.nodeInfo) {
+		return <InfoPanel rootNode={tab.nodeInfo} selectedNodes={selectedNodes} onClose={onClose} />;
+	}
+	switch (tab.component) {
 		case RightPanelComponent.PROHIBITIONS:
-			return <ProhibitionsPanel selectedNodes={selectedNodes}/>;
+			return <ProhibitionsPanel selectedNodes={selectedNodes} />;
 		case RightPanelComponent.CREATE_PROHIBITION:
 			return (
 				<ProhibitionDetails
 					selectedNodes={selectedNodes}
-					onCancel={() => onRightPanelClose?.()}
-					onSuccess={() => onRightPanelClose?.()}
+					onCancel={onClose}
+					onSuccess={onClose}
 				/>
 			);
 		case RightPanelComponent.OBLIGATIONS:
@@ -170,6 +254,100 @@ function renderComponent(component: RightPanelComponent | null, selectedNodeForI
 		case RightPanelComponent.FUNCTIONS:
 			return <Operations initialMode="function" />;
 		default:
-			return <Center style={{ height: '100%' }}>Select a component</Center>;
+			return null;
 	}
+}
+
+export function RightPanel({
+	tabs,
+	activeTabId,
+	selectedNodes,
+	onTabSwitch,
+	onTabClose,
+}: RightPanelProps) {
+	const tabBarRef = useRef<HTMLDivElement>(null);
+	const [containerWidth, setContainerWidth] = useState(600);
+
+	useEffect(() => {
+		if (!tabBarRef.current) return;
+		const ro = new ResizeObserver((entries) => setContainerWidth(entries[0].contentRect.width));
+		ro.observe(tabBarRef.current);
+		return () => ro.disconnect();
+	}, []);
+
+	const { visibleTabs, overflowTabs } = useMemo(() => {
+		const TAB_W = 160;
+		const BTN_W = 32;
+		const max = Math.max(1, Math.floor((containerWidth - BTN_W) / TAB_W));
+		if (tabs.length <= max) return { visibleTabs: tabs, overflowTabs: [] as Tab[] };
+
+		const activeIdx = tabs.findIndex((t) => t.id === activeTabId);
+		let visible = tabs.slice(0, max);
+		let overflow = tabs.slice(max);
+
+		if (activeIdx >= max) {
+			const active = tabs[activeIdx];
+			overflow = [...overflow, visible[max - 1]];
+			visible = [...visible.slice(0, max - 1), active];
+			overflow = overflow.filter((t) => t.id !== active.id);
+		}
+
+		return { visibleTabs: visible, overflowTabs: overflow };
+	}, [tabs, activeTabId, containerWidth]);
+
+	return (
+		<div
+			style={{
+				display: 'flex',
+				flexDirection: 'column',
+				height: '100%',
+				borderLeft: '1px solid var(--mantine-color-gray-3)',
+			}}
+		>
+			{/* Tab bar */}
+			<div
+				style={{
+					height: 42,
+					flexShrink: 0,
+					borderBottom: '1px solid var(--mantine-color-gray-3)',
+					backgroundColor: 'var(--mantine-color-gray-0)',
+					display: 'flex',
+					overflow: 'hidden',
+				}}
+			>
+				{/* Tab items */}
+				<div ref={tabBarRef} style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+					{visibleTabs.map((tab) => (
+						<TabItem
+							key={tab.id}
+							tab={tab}
+							isActive={tab.id === activeTabId}
+							onSwitch={onTabSwitch}
+							onClose={onTabClose}
+						/>
+					))}
+				</div>
+
+				{overflowTabs.length > 0 && (
+					<OverflowMenu tabs={overflowTabs} activeTabId={activeTabId} onSwitch={onTabSwitch} />
+				)}
+			</div>
+
+			{/* Content panels — all mounted, only active shown */}
+			<div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+				{tabs.map((tab) => (
+					<div
+						key={tab.id}
+						style={{
+							display: tab.id === activeTabId ? 'flex' : 'none',
+							flexDirection: 'column',
+							height: '100%',
+						}}
+					>
+						{renderTabContent(tab, selectedNodes, () => onTabClose(tab.id))}
+					</div>
+				))}
+			</div>
+		</div>
+	);
 }

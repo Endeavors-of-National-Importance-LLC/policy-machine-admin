@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+	IconArrowRight,
 	IconPlus,
 	IconSquareRoundedMinus,
+	IconTrash,
 	IconX
 } from "@tabler/icons-react";
 import { NodeApi } from "react-arborist";
@@ -407,8 +409,8 @@ export function InfoPanel(props: InfoPanelProps) {
 			</Group>
 			<Divider orientation="horizontal" />
 
-			{/* Content sections - horizontal layout for descendants and associations */}
-			<Box style={{ flex: 1, display: 'flex', flexDirection: 'row', gap: '8px', minHeight: 0, overflow: 'hidden' }}>
+			{/* Content sections - vertical layout for descendants and associations */}
+			<Box style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', minHeight: 0, overflow: 'hidden' }}>
 				{/* Descendants Tree / Assignment Panel */}
 				{props.rootNode.type !== "PC" && (
 					<Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
@@ -418,22 +420,13 @@ export function InfoPanel(props: InfoPanelProps) {
 									<Text size="md" fw={600}>Descendants</Text>
 									{!isAssignmentMode && (
 										<Tooltip label="Assign To">
-											<ActionIcon
-												variant="filled"
-												onClick={() => handleStartAssignment()}>
-												<IconPlus size={40} />
-											</ActionIcon>
+											<Button size="xs" variant="filled" leftSection={<IconPlus size={20} />} rightSection={<IconArrowRight size={20} />} onClick={() => handleStartAssignment()} />
 										</Tooltip>
 									)}
-									<Button
-										size="xs"
-										leftSection={<IconX size={14} />}
-										color="red"
-										onClick={handleDeassignSelected}
-										style={{ visibility: isSelectedNodeRoot && selectedDescendantNode ? 'visible' : 'hidden' }}
-									>
-										Deassign
-									</Button>
+									<Tooltip label="Deassign">
+										<Button size="xs" color="red" variant="filled" leftSection={<IconTrash size={20} />} rightSection={<IconArrowRight size={20} />} onClick={handleDeassignSelected}
+											style={{ visibility: isSelectedNodeRoot && selectedDescendantNode ? 'visible' : 'hidden' }} />
+									</Tooltip>
 								</Group>
 								<Box style={{ flex: 1, backgroundColor: theme.other.intellijContentBg, border: '1px solid var(--mantine-color-gray-3)', borderRadius: '4px', minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 									<PMTree
@@ -489,7 +482,7 @@ export function InfoPanel(props: InfoPanelProps) {
 														color="red"
 														onClick={() => handleRemoveAssignmentTarget(node)}
 													>
-														<IconSquareRoundedMinus size={12} />
+														<IconSquareRoundedMinus size={20} />
 													</ActionIcon>
 												</Group>
 											))}
@@ -526,22 +519,12 @@ export function InfoPanel(props: InfoPanelProps) {
 								<Text size="md" fw={600}>Associations</Text>
 								{canHaveIncoming && (
 									<Tooltip label="Create INCOMING association">
-										<ActionIcon
-											variant="filled"
-											color={theme.colors.green[9]}
-											onClick={() => handleStartAssociation(AssociationDirection.Incoming)}>
-											<IncomingAssociationIcon size="20px" />
-										</ActionIcon>
+										<Button size="xs" variant="filled" color={theme.colors.green[9]} leftSection={<IconPlus size={20} />} rightSection={<IncomingAssociationIcon size="20px" />} onClick={() => handleStartAssociation(AssociationDirection.Incoming)} />
 									</Tooltip>
 								)}
 								{canHaveOutgoing && (
 									<Tooltip label="Create OUTGOING association">
-										<ActionIcon
-											variant="filled"
-											color={theme.colors.green[9]}
-											onClick={() => handleStartAssociation(AssociationDirection.Outgoing)}>
-											<OutgoingAssociationIcon size="20px" />
-										</ActionIcon>
+										<Button size="xs" variant="filled" color={theme.colors.green[9]} leftSection={<IconPlus size={20} />} rightSection={<OutgoingAssociationIcon size="20px" />} onClick={() => handleStartAssociation(AssociationDirection.Outgoing)} />
 									</Tooltip>
 								)}
 							</Group>
@@ -570,7 +553,7 @@ export function InfoPanel(props: InfoPanelProps) {
 							</Box>
 						</Box>
 					);
-				})()}
+            })()}
 			</Box>
 
 			{/* Association Modal (Create/Edit) */}

@@ -1,8 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { IconBan, IconCopy, IconInfoSquareRounded, IconPlus, IconTrash } from '@tabler/icons-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	IconBan,
+	IconCopy,
+	IconInfoSquareRounded,
+	IconPlus,
+	IconTrash,
+} from '@tabler/icons-react';
 import { NodeApi } from 'react-arborist';
 import {
-	Box,
 	Button,
 	Group,
 	Menu,
@@ -14,25 +19,42 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { AssociationModal } from '@/features/info/AssociationModal';
-import { InfoPanel } from '@/features/info/InfoPanel';
 import { PMTree, TreeFilterConfig } from '@/features/pmtree';
 import { AssociationDirection, NodeIcon, TreeNode } from '@/features/pmtree/tree-utils';
-import { RightPanel, RightPanelComponent } from '@/pages/dashboard/RightPanel';
+import { RightPanel, RightPanelComponent, Tab, TOOLBAR_CONFIG } from '@/pages/dashboard/RightPanel';
 import { NodeType } from '@/shared/api/pdp.types';
 import * as AdjudicationService from '@/shared/api/pdp_adjudication.api';
 import * as QueryService from '@/shared/api/pdp_query.api';
 
-// PMTree now manages its own atoms internally - no need to create them here!
-
 export function Dashboard() {
 	const theme = useMantineTheme();
-	const [rightPanelExpanded, setRightPanelExpanded] = useState(false);
+
+	// Tab state
+	const [tabs, setTabs] = useState<Tab[]>(() =>
+		TOOLBAR_CONFIG.map((c) => ({
+			id: c.comp,
+			label: c.label,
+			icon: c.tabIcon,
+			component: c.comp,
+			permanent: true,
+		}))
+	);
+	const [activeTabId, setActiveTabId] = useState<string | null>(RightPanelComponent.PROHIBITIONS);
+
+	// Resize state
+	const [leftWidth, setLeftWidth] = useState<number>(() => {
+		const s = localStorage.getItem('dashboard-left-width');
+		return s ? parseInt(s, 10) : 320;
+	});
+	const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
+	const dividerRef = useRef<HTMLDivElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	// Other state
 	const [contextMenuOpened, setContextMenuOpened] = useState(false);
 	const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-	const [selectedNodeForInfo, setSelectedNodeForInfo] = useState<TreeNode | null>(null);
 	const [rightClickedNode, setRightClickedNode] = useState<TreeNode | null>(null);
 	const [selectedNodes, setSelectedNodes] = useState<TreeNode[]>([]);
-	const [rightPanelComponent, setRightPanelComponent] = useState<RightPanelComponent | null>(null);
 	const [createNodeModalOpened, setCreateNodeModalOpened] = useState(false);
 	const [nodeTypeToCreate, setNodeTypeToCreate] = useState<NodeType | null>(null);
 	const [newNodeName, setNewNodeName] = useState('');
@@ -46,17 +68,81 @@ export function Dashboard() {
 			.catch(() => setResourceOperations([]));
 	}, []);
 
-	// Main dashboard tree filter configuration - PMTree now manages this internally
+	// Clamp leftWidth when container shrinks
+	useEffect(() => {
+		if (!containerRef.current) return;
+		const ro = new ResizeObserver((entries) => {
+			const containerW = entries[0].contentRect.width;
+			const maxLeft = containerW - 324; // 320px min right + 4px divider
+			setLeftWidth((prev) => (prev > maxLeft ? Math.max(150, maxLeft) : prev));
+		});
+		ro.observe(containerRef.current);
+		return () => ro.disconnect();
+	}, []);
+
 	const treeFilters: TreeFilterConfig = {
 		nodeTypes: [NodeType.PC, NodeType.UA, NodeType.OA, NodeType.U, NodeType.O],
 		showOutgoingAssociations: false,
 		showIncomingAssociations: true,
 	};
 
+	// Tab management
+	const openTab = useCallback((tab: Tab) => {
+		setTabs((prev) => (prev.find((t) => t.id === tab.id) ? prev : [...prev, tab]));
+		setActiveTabId(tab.id);
+	}, []);
+
+	const closeTab = useCallback((tabId: string) => {
+		setTabs((prev) => {
+			if (prev.find((t) => t.id === tabId)?.permanent) return prev;
+			const idx = prev.findIndex((t) => t.id === tabId);
+			const next = prev.filter((t) => t.id !== tabId);
+			setActiveTabId((cur) => {
+				if (cur !== tabId) return cur;
+				if (!next.length) return null;
+				return next[Math.min(idx, next.length - 1)].id;
+			});
+			return next;
+		});
+	}, []);
+
+	const switchTab = useCallback((tabId: string) => setActiveTabId(tabId), []);
+
+	// Resize handlers
+	const handleDividerPointerDown = useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			e.preventDefault();
+			dividerRef.current?.setPointerCapture(e.pointerId);
+			dragState.current = { startX: e.clientX, startWidth: leftWidth };
+		},
+		[leftWidth]
+	);
+
+	const handleDividerPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		if (!dragState.current) return;
+		const containerW = containerRef.current?.offsetWidth ?? Infinity;
+		const newW = Math.min(
+			Math.max(150, dragState.current.startWidth + e.clientX - dragState.current.startX),
+			containerW - 324, // keep at least 320px for right panel + 4px divider
+		);
+		setLeftWidth(newW);
+	}, []);
+
+	const handleDividerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		if (!dragState.current) return;
+		const containerW = containerRef.current?.offsetWidth ?? Infinity;
+		const finalW = Math.min(
+			Math.max(150, dragState.current.startWidth + e.clientX - dragState.current.startX),
+			containerW - 324,
+		);
+		localStorage.setItem('dashboard-left-width', String(finalW));
+		dragState.current = null;
+	}, []);
+
+	// Event handlers
 	const handleNodeRightClick = (node: TreeNode, event: React.MouseEvent) => {
 		event.preventDefault();
 		if (node.isAssociation) {
-			console.log('[AssocModal] opening modal for node', node);
 			setAssociationModalNode(node);
 			setIsAssociationModalOpen(true);
 			return;
@@ -67,8 +153,16 @@ export function Dashboard() {
 	};
 
 	const handleInfoClick = () => {
-		if (rightClickedNode) {
-			setSelectedNodeForInfo(rightClickedNode);
+		if (rightClickedNode && rightClickedNode.pmId != null) {
+			const node = rightClickedNode;
+			const pmId = node.pmId!;
+			openTab({
+				id: `node-info-${pmId}`,
+				label: node.name,
+				icon: <NodeIcon type={node.type as NodeType} size={18} />,
+				component: 'NODE_INFO',
+				nodeInfo: node,
+			});
 		}
 		setContextMenuOpened(false);
 	};
@@ -87,9 +181,13 @@ export function Dashboard() {
 
 	const handleCreateProhibitionClick = () => {
 		if (rightClickedNode) {
-			setSelectedNodes([rightClickedNode]); // Set the right-clicked node as selected
-			setRightPanelComponent(RightPanelComponent.CREATE_PROHIBITION);
-			setRightPanelExpanded(true);
+			setSelectedNodes([rightClickedNode]);
+			openTab({
+				id: RightPanelComponent.CREATE_PROHIBITION,
+				label: 'Create Prohibition',
+				icon: <IconBan size={18} />,
+				component: RightPanelComponent.CREATE_PROHIBITION,
+			});
 		}
 		setContextMenuOpened(false);
 	};
@@ -114,7 +212,6 @@ export function Dashboard() {
 		setContextMenuOpened(false);
 	};
 
-	// Get valid child node types based on parent type
 	const getValidChildNodeTypes = (parentType: NodeType): NodeType[] => {
 		switch (parentType) {
 			case NodeType.PC:
@@ -149,7 +246,6 @@ export function Dashboard() {
 				if (!rightClickedNode || !rightClickedNode.pmId || !nodeTypeToCreate || !newNodeName.trim()) {
 					return;
 				}
-
 				switch (nodeTypeToCreate) {
 					case NodeType.UA:
 						await AdjudicationService.createUserAttribute(newNodeName.trim(), [
@@ -169,7 +265,6 @@ export function Dashboard() {
 						break;
 				}
 			}
-
 			notifications.show({
 				title: 'Node Created',
 				message: `Successfully created ${nodeTypeToCreate} "${newNodeName.trim()}"`,
@@ -182,7 +277,6 @@ export function Dashboard() {
 				color: 'red',
 			});
 		}
-
 		handleCreateNodeCancel();
 	};
 
@@ -193,16 +287,16 @@ export function Dashboard() {
 
 	const handleAssociationModalSubmit = async (selectedNode: TreeNode, accessRights: string[]) => {
 		const details = associationModalNode?.associationDetails;
-		console.log('[AssocModal] submit called', { details, selectedNode, accessRights });
 		const { ua, target } = details ?? {};
-		if (!ua || !target) {
-			console.warn('[AssocModal] submit: ua or target missing', { ua, target });
-			return;
-		}
+		if (!ua || !target) return;
 		try {
 			await AdjudicationService.dissociate(ua.id, target.id);
 			await AdjudicationService.associate(ua.id, target.id, accessRights);
-			notifications.show({ color: 'green', title: 'Association Updated', message: 'Access rights updated successfully' });
+			notifications.show({
+				color: 'green',
+				title: 'Association Updated',
+				message: 'Access rights updated successfully',
+			});
 		} catch (error) {
 			notifications.show({ color: 'red', title: 'Update Error', message: (error as Error).message });
 		}
@@ -211,34 +305,19 @@ export function Dashboard() {
 
 	const handleAssociationModalDelete = async (assocNode: TreeNode) => {
 		const details = assocNode.associationDetails;
-		console.log('[AssocModal] delete called', { details, assocNode });
 		const { ua, target } = details ?? {};
-		if (!ua || !target) {
-			console.warn('[AssocModal] delete: ua or target missing', { ua, target });
-			return;
-		}
+		if (!ua || !target) return;
 		try {
-			console.log('[AssocModal] calling dissociate', { uaId: ua.id, targetId: target.id });
-			const result = await AdjudicationService.dissociate(ua.id, target.id);
-			console.log('[AssocModal] dissociate result', result);
-			notifications.show({ color: 'green', title: 'Association Deleted', message: 'Association deleted successfully' });
+			await AdjudicationService.dissociate(ua.id, target.id);
+			notifications.show({
+				color: 'green',
+				title: 'Association Deleted',
+				message: 'Association deleted successfully',
+			});
 		} catch (error) {
-			console.error('[AssocModal] dissociate error', error);
 			notifications.show({ color: 'red', title: 'Delete Error', message: (error as Error).message });
 		}
 		handleAssociationModalClose();
-	};
-
-	const handleComponentClick = (component: RightPanelComponent) => {
-		if (rightPanelComponent === component && rightPanelExpanded) {
-			// If clicking the same component while expanded, collapse
-			setRightPanelExpanded(false);
-			setRightPanelComponent(null);
-		} else {
-			// Expand and set the component
-			setRightPanelComponent(component);
-			setRightPanelExpanded(true);
-		}
 	};
 
 	const handleSelect = (nodeApi: NodeApi<TreeNode>[]) => {
@@ -246,76 +325,58 @@ export function Dashboard() {
 		setSelectedNodes(treeNodes);
 	};
 
-	const handleRightPanelClose = () => {
-		setRightPanelExpanded(false);
-		setRightPanelComponent(null);
-	};
-
-	const left = (
-		<Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-			<Box style={{ flex: selectedNodeForInfo ? 0.6 : 1, minHeight: 0, overflow: 'hidden' }}>
-				<PMTree
-					style={{
-						width: '100%',
-						height: '100%',
-					}}
-					direction="ascendants"
-					filterConfig={treeFilters}
-					clickHandlers={{
-						onRightClick: handleNodeRightClick,
-						onSelect: handleSelect,
-					}}
-					showCreatePolicyClass
-					onCreatePolicyClass={() => handleCreateNodeClick(NodeType.PC)}
-				/>
-			</Box>
-
-			{selectedNodeForInfo && (
-				<Box
-					style={{
-						flex: 0.5,
-						minHeight: 0,
-						width: '100%',
-						borderTop: '1px solid var(--mantine-color-gray-3)',
-						overflow: 'hidden',
-						display: 'flex',
-						flexDirection: 'column',
-					}}
-				>
-					<InfoPanel
-						rootNode={selectedNodeForInfo}
-						selectedNodes={selectedNodes}
-						onClose={() => setSelectedNodeForInfo(null)}
-					/>
-				</Box>
-			)}
-		</Box>
-	);
-
-	const right = (
-		<div
-			style={{
-				height: '100%',
-				width: rightPanelExpanded ? '60%' : '40px',
-				flexShrink: 0,
-			}}
-		>
-			<RightPanel
-				component={rightPanelComponent}
-				isExpanded={rightPanelExpanded}
-				onComponentClick={handleComponentClick}
-				selectedNodeForInfo={selectedNodeForInfo}
-				selectedNodes={selectedNodes}
-				onRightPanelClose={handleRightPanelClose}
-			/>
-		</div>
-	);
-
 	return (
 		<>
-			<div style={{ display: 'flex', height: '100%', gap: 0, width: '100%', minHeight: 0 }}>
-				<div style={{ flex: 1, minWidth: 0 }}>{left}</div>
-				{right}
+			<div
+				ref={containerRef}
+				style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}
+			>
+				{/* Left panel — PMTree full height */}
+				<div
+					style={{
+						width: leftWidth,
+						flexShrink: 0,
+						minWidth: 150,
+						height: '100%',
+						overflow: 'hidden',
+					}}
+				>
+					<PMTree
+						style={{ width: '100%', height: '100%' }}
+						direction="ascendants"
+						filterConfig={treeFilters}
+						clickHandlers={{ onRightClick: handleNodeRightClick, onSelect: handleSelect }}
+						showCreatePolicyClass
+						onCreatePolicyClass={() => handleCreateNodeClick(NodeType.PC)}
+					/>
+				</div>
+
+				{/* Drag divider */}
+				<div
+					ref={dividerRef}
+					onPointerDown={handleDividerPointerDown}
+					onPointerMove={handleDividerPointerMove}
+					onPointerUp={handleDividerPointerUp}
+					style={{
+						width: 4,
+						flexShrink: 0,
+						cursor: 'col-resize',
+						backgroundColor: 'var(--mantine-color-gray-3)',
+						userSelect: 'none',
+						touchAction: 'none',
+					}}
+				/>
+
+				{/* Right panel — tab system */}
+				<div style={{ flex: 1, minWidth: 320, height: '100%', overflow: 'hidden' }}>
+					<RightPanel
+						tabs={tabs}
+						activeTabId={activeTabId}
+						selectedNodes={selectedNodes}
+						onTabSwitch={switchTab}
+						onTabClose={closeTab}
+					/>
+				</div>
 			</div>
 
 			<Menu
@@ -337,24 +398,21 @@ export function Dashboard() {
 					/>
 				</Menu.Target>
 				<Menu.Dropdown>
-					{/* Info section */}
 					<Menu.Item
 						onClick={handleInfoClick}
 						leftSection={<IconInfoSquareRounded size={16} />}
 						style={{
 							backgroundColor: `var(--mantine-color-${theme.primaryColor}-0)`,
-							borderLeft: `3px solid ${theme.colors[theme.primaryColor][6]}`
+							borderLeft: `3px solid ${theme.colors[theme.primaryColor][6]}`,
 						}}
 					>
 						Info
 					</Menu.Item>
 
-					{/* Copy Node Name */}
 					<Menu.Item onClick={handleCopyNodeName} leftSection={<IconCopy size={16} />}>
 						Copy Node Name
 					</Menu.Item>
 
-					{/* Create nodes section */}
 					{rightClickedNode &&
 						getValidChildNodeTypes(rightClickedNode.type as NodeType).length > 0 && (
 							<>
@@ -373,7 +431,6 @@ export function Dashboard() {
 							</>
 						)}
 
-					{/* Additional actions section */}
 					{rightClickedNode &&
 						(rightClickedNode.type === NodeType.U || rightClickedNode.type === NodeType.UA) && (
 							<>
@@ -388,7 +445,6 @@ export function Dashboard() {
 							</>
 						)}
 
-					{/* Delete section */}
 					{rightClickedNode && rightClickedNode.pmId != null && (
 						<>
 							<Menu.Divider />
@@ -405,33 +461,31 @@ export function Dashboard() {
 				</Menu.Dropdown>
 			</Menu>
 
-			{/* Association Modal */}
-			{isAssociationModalOpen && associationModalNode && (() => {
-				const details = associationModalNode.associationDetails;
-				const direction = details?.type ?? AssociationDirection.Incoming;
-				// rootNode is the "other side" not represented by associationNode itself:
-				// outgoing: associationNode holds target info, rootNode = ua (source)
-				// incoming: associationNode holds ua info, rootNode = target
-				const rootPmNode = direction === AssociationDirection.Outgoing ? details?.ua : details?.target;
-				const rootTreeNode = rootPmNode
-					? { id: crypto.randomUUID(), pmId: rootPmNode.id, name: rootPmNode.name, type: rootPmNode.type }
-					: undefined;
-				return (
-					<AssociationModal
-						opened={isAssociationModalOpen}
-						onClose={handleAssociationModalClose}
-						direction={direction}
-						onSubmit={handleAssociationModalSubmit}
-						onDelete={handleAssociationModalDelete}
-						resourceOperations={resourceOperations}
-						mode="edit"
-						associationNode={associationModalNode}
-						rootNode={rootTreeNode}
-					/>
-				);
-			})()}
+			{isAssociationModalOpen &&
+				associationModalNode &&
+				(() => {
+					const details = associationModalNode.associationDetails;
+					const direction = details?.type ?? AssociationDirection.Incoming;
+					const rootPmNode =
+						direction === AssociationDirection.Outgoing ? details?.ua : details?.target;
+					const rootTreeNode = rootPmNode
+						? { id: crypto.randomUUID(), pmId: rootPmNode.id, name: rootPmNode.name, type: rootPmNode.type }
+						: undefined;
+					return (
+						<AssociationModal
+							opened={isAssociationModalOpen}
+							onClose={handleAssociationModalClose}
+							direction={direction}
+							onSubmit={handleAssociationModalSubmit}
+							onDelete={handleAssociationModalDelete}
+							resourceOperations={resourceOperations}
+							mode="edit"
+							associationNode={associationModalNode}
+							rootNode={rootTreeNode}
+						/>
+					);
+				})()}
 
-			{/* Create Node Modal */}
 			<Modal
 				opened={createNodeModalOpened}
 				onClose={handleCreateNodeCancel}
@@ -445,7 +499,6 @@ export function Dashboard() {
 				size="sm"
 			>
 				<Stack gap="md">
-					{/* Parent Node Information */}
 					{rightClickedNode && nodeTypeToCreate !== NodeType.PC && (
 						<Group
 							gap="sm"
@@ -471,7 +524,6 @@ export function Dashboard() {
 						</Group>
 					)}
 
-					{/* Name Input */}
 					<TextInput
 						label="Name"
 						placeholder="Name"
@@ -484,12 +536,9 @@ export function Dashboard() {
 						}}
 						data-autofocus
 						required
-						leftSection={
-							nodeTypeToCreate && <NodeIcon type={nodeTypeToCreate} size={20} />
-						}
+						leftSection={nodeTypeToCreate && <NodeIcon type={nodeTypeToCreate} size={20} />}
 					/>
 
-					{/* Action Buttons */}
 					<Group justify="flex-end" gap="sm" mt="md">
 						<Button variant="outline" onClick={handleCreateNodeCancel}>
 							Cancel

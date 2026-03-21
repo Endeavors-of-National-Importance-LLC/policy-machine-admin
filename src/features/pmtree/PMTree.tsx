@@ -290,7 +290,7 @@ export function PMTree(props: PMTreeProps) {
                                         width={width}
                                         height={height}
                                         indent={INDENT_NUM}
-                                        rowHeight={props.rowHeight ?? 22}
+                                        rowHeight={props.rowHeight ?? 28}
                                         overscanCount={props.overscanCount ?? 20}
                                         onSelect={props.clickHandlers?.onSelect}
                                         disableMultiSelection={props.disableMultiSelection ?? true}

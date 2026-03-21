@@ -24,6 +24,7 @@ import {
 	truncateMiddle,
 } from '@/features/pmtree/tree-utils';
 import { NODE_TYPES, NodeType } from '@/shared/api/pdp.types';
+import { AssociationInfoPanel } from './AssociationInfoPanel';
 
 interface AssociationCreationModalProps {
 	opened: boolean;
@@ -240,100 +241,28 @@ export function AssociationModal({
 							/>
 						</Box>
 					</Box>
-				</Stack>
-			) : (
-				// Edit mode: Source, Target, and Access Rights stacked vertically
-				<Stack gap="md" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-					{/* Source and Target Nodes side by side */}
-					<Group gap="md" align="center" style={{ justifyContent: 'space-between', flexShrink: 0 }}>
-						{/* Source Node */}
-						<Box style={{ flex: 1 }}>
-							<Text size="s" mb={4}>
-								Source Node
-							</Text>
-							{sourceNode && (
-								<Group gap="xs">
-									<NodeIcon type={sourceNode.type} size={30} />
-									<Text size="lg" fw={500}>
-										{truncateMiddle(sourceNode.name)}
-									</Text>
-								</Group>
-							)}
-						</Box>
 
-						{/* Association Icon */}
-						<Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-							<Text size="xs" c="dimmed" mb={4} />
-							<OutgoingAssociationIcon
-								size="32"
-								color={theme.colors.green[9]} />
-						</Box>
-
-						{/* Target Node */}
-						<Box style={{ flex: 1 }}>
-							<Text size="s" mb={4}>
-								Target Node
-							</Text>
-							{targetNode && (
-								<Group gap="xs">
-									<NodeIcon type={targetNode.type} size={30} />
-									<Text size="lg" fw={500}>
-										{truncateMiddle(targetNode.name)}
-									</Text>
-								</Group>
-							)}
-						</Box>
-					</Group>
-
-					{/* Access Rights */}
-					<Box
-						style={{
-							minHeight: 0,
-							flex: 1,
-							minWidth: 0,
-							display: 'flex',
-							flexDirection: 'column',
-							border: '1px solid var(--mantine-color-gray-3)',
-							borderRadius: '4px',
-							overflow: 'hidden',
-							backgroundColor: 'var(--mantine-color-gray-0)',
-						}}
-					>
-						<AccessRightsSelection
-							selectedRights={selectedAccessRights}
-							onRightsChange={setSelectedAccessRights}
-							resourceAccessRights={resourceOperations}
-							readOnly={!selectedNode}
-						/>
-					</Box>
-				</Stack>
-			)}
-
-			{/* Bottom buttons */}
-			<Group justify="center" mt="md">
-				{isCreateMode ? (
-					<>
+					{/* Bottom buttons — create mode only */}
+					<Group justify="center" mt="md">
 						<Button variant="default" color="gray" onClick={onClose}>
 							Cancel
 						</Button>
 						<Button variant="filled" color="blue" onClick={handleSubmit} disabled={submitDisabled}>
 							Create
 						</Button>
-					</>
-				) : (
-					<>
-						<Button variant="default" color="gray" onClick={onClose}>
-							Cancel
-						</Button>
-						<Button variant="filled" color="red" onClick={handleDelete}>
-							Delete
-						</Button>
-						<Button variant="filled" color="blue" onClick={handleSubmit} disabled={submitDisabled}>
-							Update
-						</Button>
-					</>
-				)}
-			</Group>
+					</Group>
+				</Stack>
+			) : (
+				// Edit mode: delegate to AssociationInfoPanel
+				associationNode && (
+					<AssociationInfoPanel
+						associationNode={associationNode}
+						onClose={onClose}
+						onUpdated={onClose}
+						onDeleted={onClose}
+					/>
+				)
+			)}
 		</Modal>
 	);
 }

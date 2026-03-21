@@ -18,13 +18,11 @@ import {
 	useMantineTheme,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { AssociationModal } from '@/features/info/AssociationModal';
 import { PMTree, TreeFilterConfig } from '@/features/pmtree';
-import { AssociationDirection, NodeIcon, TreeNode } from '@/features/pmtree/tree-utils';
+import { OutgoingAssociationIcon, NodeIcon, TreeNode } from '@/features/pmtree/tree-utils';
 import { RightPanel, RightPanelComponent, Tab, TOOLBAR_CONFIG } from '@/pages/dashboard/RightPanel';
 import { NodeType } from '@/shared/api/pdp.types';
 import * as AdjudicationService from '@/shared/api/pdp_adjudication.api';
-import * as QueryService from '@/shared/api/pdp_query.api';
 
 export function Dashboard() {
 	const theme = useMantineTheme();
@@ -58,15 +56,6 @@ export function Dashboard() {
 	const [createNodeModalOpened, setCreateNodeModalOpened] = useState(false);
 	const [nodeTypeToCreate, setNodeTypeToCreate] = useState<NodeType | null>(null);
 	const [newNodeName, setNewNodeName] = useState('');
-	const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
-	const [associationModalNode, setAssociationModalNode] = useState<TreeNode | null>(null);
-	const [resourceOperations, setResourceOperations] = useState<string[]>([]);
-
-	useEffect(() => {
-		QueryService.getResourceAccessRights()
-			.then(setResourceOperations)
-			.catch(() => setResourceOperations([]));
-	}, []);
 
 	// Clamp leftWidth when container shrinks
 	useEffect(() => {
@@ -143,8 +132,13 @@ export function Dashboard() {
 	const handleNodeRightClick = (node: TreeNode, event: React.MouseEvent) => {
 		event.preventDefault();
 		if (node.isAssociation) {
-			setAssociationModalNode(node);
-			setIsAssociationModalOpen(true);
+			openTab({
+				id: `assoc-info-${node.id}`,
+				label: node.name,
+				icon: <OutgoingAssociationIcon size="18" color="currentColor" />,
+				component: RightPanelComponent.ASSOCIATION_INFO,
+				nodeInfo: node,
+			});
 			return;
 		}
 		setRightClickedNode(node);
@@ -278,46 +272,6 @@ export function Dashboard() {
 			});
 		}
 		handleCreateNodeCancel();
-	};
-
-	const handleAssociationModalClose = () => {
-		setIsAssociationModalOpen(false);
-		setAssociationModalNode(null);
-	};
-
-	const handleAssociationModalSubmit = async (selectedNode: TreeNode, accessRights: string[]) => {
-		const details = associationModalNode?.associationDetails;
-		const { ua, target } = details ?? {};
-		if (!ua || !target) return;
-		try {
-			await AdjudicationService.dissociate(ua.id, target.id);
-			await AdjudicationService.associate(ua.id, target.id, accessRights);
-			notifications.show({
-				color: 'green',
-				title: 'Association Updated',
-				message: 'Access rights updated successfully',
-			});
-		} catch (error) {
-			notifications.show({ color: 'red', title: 'Update Error', message: (error as Error).message });
-		}
-		handleAssociationModalClose();
-	};
-
-	const handleAssociationModalDelete = async (assocNode: TreeNode) => {
-		const details = assocNode.associationDetails;
-		const { ua, target } = details ?? {};
-		if (!ua || !target) return;
-		try {
-			await AdjudicationService.dissociate(ua.id, target.id);
-			notifications.show({
-				color: 'green',
-				title: 'Association Deleted',
-				message: 'Association deleted successfully',
-			});
-		} catch (error) {
-			notifications.show({ color: 'red', title: 'Delete Error', message: (error as Error).message });
-		}
-		handleAssociationModalClose();
 	};
 
 	const handleSelect = (nodeApi: NodeApi<TreeNode>[]) => {
@@ -460,31 +414,6 @@ export function Dashboard() {
 					)}
 				</Menu.Dropdown>
 			</Menu>
-
-			{isAssociationModalOpen &&
-				associationModalNode &&
-				(() => {
-					const details = associationModalNode.associationDetails;
-					const direction = details?.type ?? AssociationDirection.Incoming;
-					const rootPmNode =
-						direction === AssociationDirection.Outgoing ? details?.ua : details?.target;
-					const rootTreeNode = rootPmNode
-						? { id: crypto.randomUUID(), pmId: rootPmNode.id, name: rootPmNode.name, type: rootPmNode.type }
-						: undefined;
-					return (
-						<AssociationModal
-							opened={isAssociationModalOpen}
-							onClose={handleAssociationModalClose}
-							direction={direction}
-							onSubmit={handleAssociationModalSubmit}
-							onDelete={handleAssociationModalDelete}
-							resourceOperations={resourceOperations}
-							mode="edit"
-							associationNode={associationModalNode}
-							rootNode={rootTreeNode}
-						/>
-					);
-				})()}
 
 			<Modal
 				opened={createNodeModalOpened}

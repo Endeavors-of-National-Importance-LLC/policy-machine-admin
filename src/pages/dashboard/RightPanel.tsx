@@ -5,6 +5,7 @@ import { ProhibitionDetails, ProhibitionsPanel } from '@/features/prohibitions';
 import { ObligationsPanel } from '@/features/obligations/ObligationsPanel';
 import { Operations } from '@/features/operations';
 import { InfoPanel } from '@/features/info/InfoPanel';
+import { AssociationInfoPanel } from '@/features/info/AssociationInfoPanel';
 import { AdminOperationIcon } from '@/components/icons/AdminOperationIcon';
 import { ResourceOperationIcon } from '@/components/icons/ResourceOperationIcon';
 import { QueryOperationIcon } from '@/components/icons/QueryOperationIcon';
@@ -14,6 +15,7 @@ import { TreeNode } from '@/features/pmtree/tree-utils';
 
 export enum RightPanelComponent {
 	NODE_INFO = 'NODE_INFO',
+	ASSOCIATION_INFO = 'ASSOCIATION_INFO',
 	PROHIBITIONS = 'PROHIBITIONS',
 	CREATE_PROHIBITION = 'CREATE_PROHIBITION',
 	OBLIGATIONS = 'OBLIGATIONS',
@@ -231,6 +233,10 @@ function renderTabContent(
 		return <InfoPanel rootNode={tab.nodeInfo} selectedNodes={selectedNodes} onClose={onClose} />;
 	}
 	switch (tab.component) {
+		case RightPanelComponent.ASSOCIATION_INFO:
+			return tab.nodeInfo ? (
+				<AssociationInfoPanel associationNode={tab.nodeInfo} onClose={onClose} />
+			) : null;
 		case RightPanelComponent.PROHIBITIONS:
 			return <ProhibitionsPanel selectedNodes={selectedNodes} />;
 		case RightPanelComponent.CREATE_PROHIBITION:

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	IconBan,
 	IconCopy,
@@ -69,11 +69,11 @@ export function Dashboard() {
 		return () => ro.disconnect();
 	}, []);
 
-	const treeFilters: TreeFilterConfig = {
+	const treeFilters = useMemo<TreeFilterConfig>(() => ({
 		nodeTypes: [NodeType.PC, NodeType.UA, NodeType.OA, NodeType.U, NodeType.O],
 		showOutgoingAssociations: false,
 		showIncomingAssociations: true,
-	};
+	}), []);
 
 	// Tab management
 	const openTab = useCallback((tab: Tab) => {

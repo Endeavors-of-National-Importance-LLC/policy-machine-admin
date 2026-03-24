@@ -96,8 +96,12 @@ export function PMTree(props: PMTreeProps) {
         [setFilterConfigAtom]
     );
 
-    // Use external filterConfig if provided, otherwise use internal
-    const activeFilterConfig = props.filterConfig || internalFilters;
+    // Always use internalFilters as the active config — it is initialised from
+    // props.filterConfig (see useState above) and updated by the toolbar.
+    // Using props.filterConfig directly would mean external re-renders create a
+    // new object reference every time, bypassing toolbar changes and causing
+    // the filter effect to re-run on every parent render.
+    const activeFilterConfig = internalFilters;
 
     // Update the filterConfig atom whenever activeFilterConfig changes
     useEffect(() => {
@@ -120,8 +124,6 @@ export function PMTree(props: PMTreeProps) {
 
             const treeNodes = transformNodesToTreeNodes(nodes);
             setPOSNodes(treeNodes);
-            // Initialize treeData with the loaded nodes
-            setTreeData(treeNodes);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
             setInitialError(errorMessage);
@@ -139,6 +141,15 @@ export function PMTree(props: PMTreeProps) {
     useEffect(() => {
         loadPOSNodes();
     }, [loadPOSNodes]);
+
+    // Re-filter POS root nodes whenever posNodes or activeFilterConfig changes
+    useEffect(() => {
+        if (props.rootNodes !== undefined) return;
+        const filtered = activeFilterConfig.nodeTypes.length > 0
+            ? posNodes.filter(n => activeFilterConfig.nodeTypes.includes(n.type as NodeType))
+            : posNodes;
+        setTreeData(filtered);
+    }, [posNodes, activeFilterConfig, props.rootNodes, setTreeData]);
 
     useEffect(() => {
         // Update tree data when rootNodes prop changes

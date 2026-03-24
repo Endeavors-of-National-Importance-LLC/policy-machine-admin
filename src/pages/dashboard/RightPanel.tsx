@@ -230,7 +230,7 @@ function renderTabContent(
 	onClose: () => void
 ): React.ReactNode {
 	if (tab.component === 'NODE_INFO' && tab.nodeInfo) {
-		return <InfoPanel rootNode={tab.nodeInfo} selectedNodes={selectedNodes} onClose={onClose} />;
+		return <InfoPanel rootNode={tab.nodeInfo} onClose={onClose} />;
 	}
 	switch (tab.component) {
 		case RightPanelComponent.ASSOCIATION_INFO:

@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	IconArrowRight,
+	IconEdit,
 	IconPlus,
 	IconSquareRoundedMinus,
 	IconTrash,
 	IconX
 } from "@tabler/icons-react";
 import { NodeApi } from "react-arborist";
-import {ActionIcon, Alert, Box, Button, Divider, Group, Stack, Text, Tooltip, useMantineTheme} from "@mantine/core";
+import {ActionIcon, Alert, Box, Button, Divider, Group, Popover, Stack, Text, Tooltip, useMantineTheme} from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { PMTree } from "@/features/pmtree";
 import { fetchAssociationChildren } from "@/features/pmtree/tree-data-fetcher";
@@ -16,6 +17,7 @@ import { NODE_TYPES, NodePrivilegeInfo, NodeType } from "@/shared/api/pdp.types"
 import * as QueryService from "@/shared/api/pdp_query.api";
 import * as AdjudicationService from "@/shared/api/pdp_adjudication.api";
 import { AssociationModal } from "./AssociationModal";
+import { AccessRightsTree } from "@/components/access-rights";
 
 // Helper function to transform NodePrivilegeInfo to TreeNode
 function transformNodePrivilegeInfoToTreeNodes(privileges: NodePrivilegeInfo[]): TreeNode[] {
@@ -26,10 +28,17 @@ function transformNodePrivilegeInfoToTreeNodes(privileges: NodePrivilegeInfo[]):
 	return transformNodesToTreeNodes(nodes);
 }
 
+type InlineAssocState = {
+	direction: AssociationDirection;
+	otherNode: TreeNode | null;
+	selectedRights: string[];
+	pickingNode: TreeNode | null;
+	isPicking: boolean;
+} | null;
+
 
 export interface InfoPanelProps {
 	rootNode: TreeNode;
-	selectedNodes?: TreeNode[];
 	onClose?: () => void;
 }
 
@@ -41,14 +50,17 @@ export function InfoPanel(props: InfoPanelProps) {
 	const [resourceOperations, setResourceOperations] = useState<string[]>([]);
 
 	// Assignment mode state
-	const [isAssignmentMode, setIsAssignmentMode] = useState(false);
 	const [assignmentTargets, setAssignmentTargets] = useState<TreeNode[]>([]);
+	const [isAssignmentPickerOpen, setIsAssignmentPickerOpen] = useState(false);
+	const [pickingAssignmentNode, setPickingAssignmentNode] = useState<TreeNode | null>(null);
 
-	// Association modal state
+	// Association modal state (edit only)
 	const [isAssociationModalOpen, setIsAssociationModalOpen] = useState(false);
-	const [associationModalMode, setAssociationModalMode] = useState<'create' | 'edit'>('create');
 	const [associationDirection, setAssociationDirection] = useState<AssociationDirection | null>(null);
 	const [editingAssociationNode, setEditingAssociationNode] = useState<TreeNode | null>(null);
+
+	// Inline association creation state
+	const [inlineAssoc, setInlineAssoc] = useState<InlineAssocState>(null);
 
 	// Descendants tree selection state
 	const [selectedDescendantNode, setSelectedDescendantNode] = useState<TreeNode | null>(null);
@@ -58,8 +70,10 @@ export function InfoPanel(props: InfoPanelProps) {
 
 	// Reset assignment mode when a different node is opened
 	useEffect(() => {
-		setIsAssignmentMode(false);
 		setAssignmentTargets([]);
+		setIsAssignmentPickerOpen(false);
+		setPickingAssignmentNode(null);
+		setInlineAssoc(null);
 	}, [props.rootNode.pmId]);
 
 	// Handle selection in descendants tree
@@ -103,14 +117,29 @@ export function InfoPanel(props: InfoPanelProps) {
 
 	// Assignment mode handlers
 	const handleStartAssignment = useCallback(() => {
-		setIsAssignmentMode(true);
-		setAssignmentTargets([]); // Start with empty list
+		setAssignmentTargets([]);
+		setIsAssignmentPickerOpen(true);
 	}, []);
 
 	const handleCancelAssignment = useCallback(() => {
-		setIsAssignmentMode(false);
 		setAssignmentTargets([]);
+		setIsAssignmentPickerOpen(false);
+		setPickingAssignmentNode(null);
 	}, []);
+
+	const handleAssignmentPickerSelect = useCallback((nodes: NodeApi<TreeNode>[]) => {
+		const node = nodes?.[0]?.data ?? null;
+		setPickingAssignmentNode(node);
+	}, []);
+
+	const handleConfirmAssignmentPicker = useCallback(() => {
+		if (!pickingAssignmentNode) return;
+		setAssignmentTargets(prev =>
+			prev.some(n => n.id === pickingAssignmentNode.id) ? prev : [...prev, pickingAssignmentNode]
+		);
+		setPickingAssignmentNode(null);
+		// Keep picker open so user can add more
+	}, [pickingAssignmentNode]);
 
 	const handleSubmitAssignment = useCallback(async () => {
 		const descendantIds = assignmentTargets.map(node => node.pmId).filter(id => id !== undefined);
@@ -123,9 +152,9 @@ export function InfoPanel(props: InfoPanelProps) {
 			// Use the assign API to create assignments
 			await AdjudicationService.assign(props.rootNode.pmId, descendantIds);
 
-			// Reset assignment mode
-			setIsAssignmentMode(false);
 			setAssignmentTargets([]);
+			setIsAssignmentPickerOpen(false);
+			setPickingAssignmentNode(null);
 
 			// Refresh descendants tree
 			const updatedDescendants = await QueryService.selfComputeAdjacentDescendantPrivileges(props.rootNode.pmId);
@@ -157,17 +186,74 @@ export function InfoPanel(props: InfoPanelProps) {
 		setAssignmentTargets(prev => prev.filter(node => node.id !== nodeToRemove.id));
 	}, []);
 
-	// Association modal handlers
+	// Inline association handlers
 	const handleStartAssociation = useCallback((direction: AssociationDirection) => {
-		setAssociationModalMode('create');
-		setAssociationDirection(direction);
-		setEditingAssociationNode(null);
-		setIsAssociationModalOpen(true);
+		setInlineAssoc({ direction, otherNode: null, selectedRights: [], pickingNode: null, isPicking: false });
 		setSelectedAssociationDirection(direction);
 	}, []);
 
+	const handleOpenPicker = useCallback(() => {
+		setInlineAssoc(prev => prev ? { ...prev, isPicking: true, pickingNode: null } : null);
+	}, []);
+
+	const handleClosePicker = useCallback(() => {
+		setInlineAssoc(prev => prev ? { ...prev, isPicking: false, pickingNode: null } : null);
+	}, []);
+
+	const handlePickerNodeSelect = useCallback((nodes: NodeApi<TreeNode>[]) => {
+		const node = nodes?.[0]?.data ?? null;
+		setInlineAssoc(prev => prev ? { ...prev, pickingNode: node } : null);
+	}, []);
+
+	const handleConfirmPicker = useCallback(() => {
+		if (!inlineAssoc?.pickingNode) return;
+		const { direction, pickingNode } = inlineAssoc;
+		const type = pickingNode.type as NodeType;
+
+		if (direction === AssociationDirection.Incoming) {
+			if (type !== NodeType.UA) {
+				notifications.show({ color: 'red', title: 'Invalid Source Node', message: 'Source node must be a User Attribute (UA).' });
+				return;
+			}
+		} else {
+			if (type !== NodeType.UA && type !== NodeType.OA && type !== NodeType.O) {
+				notifications.show({ color: 'red', title: 'Invalid Target Node', message: 'Target node must be a User Attribute (UA), Object Attribute (OA), or Object (O).' });
+				return;
+			}
+		}
+
+		setInlineAssoc(prev =>
+			prev ? { ...prev, otherNode: prev.pickingNode, isPicking: false, pickingNode: null } : null
+		);
+	}, [inlineAssoc]);
+
+	const handleCancelInlineAssoc = useCallback(() => setInlineAssoc(null), []);
+
+	const handleSubmitInlineAssoc = useCallback(async () => {
+		if (!inlineAssoc?.otherNode?.pmId || !props.rootNode.pmId) return;
+		const otherNodePmId = inlineAssoc.otherNode.pmId;
+		const rootPmId = props.rootNode.pmId;
+		const { direction, otherNode, selectedRights } = inlineAssoc;
+		const isOutgoing = direction === AssociationDirection.Outgoing;
+		const sourcePmId = isOutgoing ? rootPmId : otherNodePmId;
+		const targetPmId = isOutgoing ? otherNodePmId : rootPmId;
+		try {
+			await AdjudicationService.associate(sourcePmId, targetPmId, selectedRights);
+			notifications.show({ color: 'green', title: 'Association Created', message: `Created association with ${otherNode.name}` });
+			const refreshed = await fetchAssociationChildren(
+				props.rootNode.pmId,
+				{ nodeTypes: [NodeType.UA, NodeType.OA, NodeType.U, NodeType.O], showIncomingAssociations: true, showOutgoingAssociations: true },
+				props.rootNode.id
+			);
+			setAssociationRootNodes(refreshed);
+			setInlineAssoc(null);
+		} catch (error) {
+			notifications.show({ color: 'red', title: 'Association Error', message: (error as Error).message });
+		}
+	}, [inlineAssoc, props.rootNode]);
+
+	// Association modal handlers (edit only)
 	const handleEditAssociation = useCallback((associationNode: TreeNode) => {
-		setAssociationModalMode('edit');
 		setAssociationDirection(associationNode.associationDetails?.type || AssociationDirection.Incoming);
 		setEditingAssociationNode(associationNode);
 		setIsAssociationModalOpen(true);
@@ -189,68 +275,38 @@ export function InfoPanel(props: InfoPanelProps) {
 			const sourcePmId = isOutgoing ? props.rootNode.pmId : selectedNode.pmId;
 			const targetPmId = isOutgoing ? selectedNode.pmId : props.rootNode.pmId;
 
-			if (associationModalMode === 'edit') {
-				// Update existing association: dissociate then reassociate
-				await AdjudicationService.dissociate(sourcePmId, targetPmId);
-				await AdjudicationService.associate(sourcePmId, targetPmId, accessRights);
+			// Update existing association: dissociate then reassociate
+			await AdjudicationService.dissociate(sourcePmId, targetPmId);
+			await AdjudicationService.associate(sourcePmId, targetPmId, accessRights);
 
-				// Update the association node in state
-				setAssociationRootNodes(prev => prev.map(node => {
-					if (node.pmId === selectedNode.pmId && node.associationDetails?.type === associationDirection) {
-						return {
-							...node,
-							associationDetails: {
-								...node.associationDetails,
-								accessRightSet: accessRights,
-							},
-						};
-					}
-					return node;
-				}));
+			// Update the association node in state
+			setAssociationRootNodes(prev => prev.map(node => {
+				if (node.pmId === selectedNode.pmId && node.associationDetails?.type === associationDirection) {
+					return {
+						...node,
+						associationDetails: {
+							...node.associationDetails,
+							accessRightSet: accessRights,
+						},
+					};
+				}
+				return node;
+			}));
 
-				notifications.show({
-					color: 'green',
-					title: 'Association Updated',
-					message: 'Association access rights have been updated successfully',
-				});
-			} else {
-				// Create new association
-				await AdjudicationService.associate(sourcePmId, targetPmId, accessRights);
-
-				const newAssociationNode: TreeNode = {
-					id: crypto.randomUUID(),
-					pmId: selectedNode.pmId,
-					name: selectedNode.name,
-					type: selectedNode.type,
-					children: [],
-					parent: props.rootNode.id,
-					isAssociation: true,
-					associationDetails: {
-						type: associationDirection,
-						accessRightSet: accessRights,
-					},
-				};
-
-				setAssociationRootNodes(prev => {
-					const filtered = prev.filter(node => !(node.associationDetails?.type === newAssociationNode.associationDetails?.type && node.pmId === newAssociationNode.pmId));
-					return [...filtered, newAssociationNode];
-				});
-
-				notifications.show({
-					color: 'green',
-					title: 'Association Created',
-					message: `Association successfully created with ${isOutgoing ? 'target' : 'source'} ${selectedNode.name}`,
-				});
-			}
+			notifications.show({
+				color: 'green',
+				title: 'Association Updated',
+				message: 'Association access rights have been updated successfully',
+			});
 
 		} catch (error) {
 			notifications.show({
 				color: 'red',
-				title: associationModalMode === 'edit' ? 'Update Error' : 'Association Error',
+				title: 'Update Error',
 				message: (error as Error).message,
 			});
 		}
-	}, [props.rootNode, associationDirection, associationModalMode]);
+	}, [props.rootNode, associationDirection]);
 
 	const handleDeleteAssociation = useCallback(async (associationNode: TreeNode) => {
 		if (!props.rootNode?.pmId || !associationNode.pmId) {
@@ -282,19 +338,6 @@ export function InfoPanel(props: InfoPanelProps) {
 		}
 	}, [props.rootNode]);
 
-
-	// Accumulate selected nodes when in assignment mode
-	useEffect(() => {
-		if (isAssignmentMode && props.selectedNodes && props.selectedNodes.length > 0) {
-			setAssignmentTargets(prev => {
-				// Add any new nodes that aren't already in the assignment targets
-				const newNodes = props.selectedNodes!.filter(selectedNode =>
-					!prev.some(existingNode => existingNode.id === selectedNode.id)
-				);
-				return [...prev, ...newNodes];
-			});
-		}
-	}, [props.selectedNodes, isAssignmentMode]);
 
 
 	// Fetch association nodes for the root node
@@ -364,7 +407,7 @@ export function InfoPanel(props: InfoPanelProps) {
 			handleEditAssociation(selectedNode);
 		}
 	}, [handleEditAssociation]);
-	
+
 	// Memoize tree props to prevent unnecessary re-renders
 	const associationTreeProps = useMemo(() => ({
 		direction: "ascendants" as const,
@@ -414,97 +457,110 @@ export function InfoPanel(props: InfoPanelProps) {
 				{/* Descendants Tree / Assignment Panel */}
 				{props.rootNode.type !== "PC" && (
 					<Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-						{!isAssignmentMode ? (
-							<>
-								<Group gap="xs" align="center" mb={8}>
-									<Text size="md" fw={600}>Descendants</Text>
-									{!isAssignmentMode && (
-										<Tooltip label="Assign To">
-											<Button size="xs" variant="filled" leftSection={<IconPlus size={20} />} rightSection={<IconArrowRight size={20} />} onClick={() => handleStartAssignment()} />
-										</Tooltip>
-									)}
-									<Tooltip label="Deassign">
-										<Button size="xs" color="red" variant="filled" leftSection={<IconTrash size={20} />} rightSection={<IconArrowRight size={20} />} onClick={handleDeassignSelected}
-											style={{ visibility: isSelectedNodeRoot && selectedDescendantNode ? 'visible' : 'hidden' }} />
-									</Tooltip>
-								</Group>
-								<Box style={{ flex: 1, backgroundColor: theme.other.intellijContentBg, border: '1px solid var(--mantine-color-gray-3)', borderRadius: '4px', minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-									<PMTree
-										key={`descendants-${descendantsNodes.length}-${descendantsNodes.map(n => n.id).join('-')}`}
-										direction="descendants"
-										rootNodes={descendantsNodes}
-										showReset
-										showTreeFilters
-										showDirection
-										filterConfig={{
-											nodeTypes: NODE_TYPES,
-											showIncomingAssociations: false,
-											showOutgoingAssociations: false,
-										}}
-										clickHandlers={{
-											onSelect: handleDescendantSelection
-										}}
-									/>
-								</Box>
-							</>
-						) : (
-							<>
-								<Text size="sm" fw={600} mb={4}>Assign To</Text>
-								<Box style={{
-									flex: 1,
-									border: '1px solid var(--mantine-color-gray-3)',
-									borderRadius: '4px',
-									padding: '8px',
-									backgroundColor: 'var(--mantine-color-gray-0)',
-									overflow: 'auto'
-								}}>
-									{assignmentTargets.length === 0 && (
-										<Alert variant="light" color="blue" p="xs">
-											<Text size="xs">Select nodes from tree</Text>
-										</Alert>
-									)}
-									{assignmentTargets.length > 0 ? (
-										<Stack gap={2}>
-											{assignmentTargets.map((node) => (
-												<Group key={node.id} justify="space-between" style={{
-													padding: '4px 8px',
-													border: '1px solid var(--mantine-color-gray-2)',
-													borderRadius: '4px',
-													backgroundColor: 'white'
-												}}>
-													<Group gap="xs">
-														<NodeIcon type={node.type} size={14} />
-														<Text size="xs">{node.name}</Text>
-													</Group>
-													<ActionIcon
-														size="xs"
-														variant="subtle"
-														color="red"
-														onClick={() => handleRemoveAssignmentTarget(node)}
-													>
-														<IconSquareRoundedMinus size={20} />
-													</ActionIcon>
-												</Group>
-											))}
-										</Stack>
-									) : null}
-								</Box>
-
-								{/* Submit/Cancel Buttons */}
-								<Group justify="center" mt={4} gap="xs">
-									<Button size="xs" onClick={handleSubmitAssignment}>
-										Submit
-									</Button>
-									<Button size="xs" variant="outline" onClick={handleCancelAssignment}>
-										Cancel
-									</Button>
-								</Group>
-							</>
-						)}
+						<>
+							<Group gap="xs" align="center" mb={8}>
+								<Text size="md" fw={600}>Descendants</Text>
+								<Popover
+									opened={isAssignmentPickerOpen}
+									onClose={handleCancelAssignment}
+									position="bottom-start"
+									width={520}
+									withArrow
+									shadow="md"
+								>
+									<Popover.Target>
+										<Box style={{ display: 'inline-block' }}>
+											<Tooltip label="Assign To">
+												<Button size="xs" variant="filled" leftSection={<IconPlus size={20} />} rightSection={<IconArrowRight size={20} />} onClick={handleStartAssignment} />
+											</Tooltip>
+										</Box>
+									</Popover.Target>
+									<Popover.Dropdown style={{ padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid var(--mantine-primary-color-filled)', borderRadius: '6px' }}>
+										<Group px="sm" py={8} style={{ flexShrink: 0, backgroundColor: 'var(--mantine-primary-color-0)', borderBottom: '1px solid var(--mantine-primary-color-3)' }}>
+											<Text size="xs" fw={700} c="var(--mantine-primary-color-filled)">Select Node to Assign</Text>
+										</Group>
+										<Box style={{ height: 300, minHeight: 0 }}>
+											<PMTree
+												direction="ascendants"
+												showReset
+												showTreeFilters={false}
+												showDirection={false}
+												showCreatePolicyClass={false}
+												filterConfig={{
+													nodeTypes: NODE_TYPES,
+													showIncomingAssociations: false,
+													showOutgoingAssociations: false,
+												}}
+												clickHandlers={{ onSelect: handleAssignmentPickerSelect }}
+											/>
+										</Box>
+										<Group gap="xs" p="xs" style={{ flexShrink: 0, borderTop: '1px solid var(--mantine-color-gray-2)', borderBottom: '1px solid var(--mantine-color-gray-2)', minHeight: 32 }}>
+											{pickingAssignmentNode ? (
+												<>
+													<NodeIcon type={pickingAssignmentNode.type} size={18} />
+													<Text size="xs" fw={500} style={{ flex: 1 }}>{pickingAssignmentNode.name}</Text>
+												</>
+											) : (
+												<Text size="xs" c="dimmed">No node selected</Text>
+											)}
+										</Group>
+										{assignmentTargets.length > 0 && (
+											<Box style={{ flexShrink: 0, borderBottom: '1px solid var(--mantine-color-gray-2)', padding: '4px 8px', maxHeight: 120, overflow: 'auto' }}>
+												<Stack gap={2}>
+													{assignmentTargets.map((node) => (
+														<Group key={node.id} justify="space-between" style={{
+															padding: '2px 4px',
+															border: '1px solid var(--mantine-color-gray-2)',
+															borderRadius: '4px',
+															backgroundColor: 'white',
+														}}>
+															<Group gap="xs">
+																<NodeIcon type={node.type} size={14} />
+																<Text size="xs">{node.name}</Text>
+															</Group>
+															<ActionIcon size="xs" variant="subtle" color="red" onClick={() => handleRemoveAssignmentTarget(node)}>
+																<IconSquareRoundedMinus size={20} />
+															</ActionIcon>
+														</Group>
+													))}
+												</Stack>
+											</Box>
+										)}
+										<Group justify="flex-end" gap="xs" p="xs" style={{ flexShrink: 0 }}>
+											<Button size="xs" variant="subtle" color="gray" onClick={handleCancelAssignment}>Cancel</Button>
+											<Button size="xs" disabled={!pickingAssignmentNode} onClick={handleConfirmAssignmentPicker}>Add</Button>
+											<Button size="xs" disabled={assignmentTargets.length === 0} onClick={handleSubmitAssignment}>Assign</Button>
+										</Group>
+									</Popover.Dropdown>
+								</Popover>
+								<Tooltip label="Deassign">
+									<Button size="xs" color="red" variant="filled" leftSection={<IconTrash size={20} />} rightSection={<IconArrowRight size={20} />} onClick={handleDeassignSelected}
+										style={{ visibility: isSelectedNodeRoot && selectedDescendantNode ? 'visible' : 'hidden' }} />
+								</Tooltip>
+							</Group>
+							<Box style={{ flex: 1, backgroundColor: theme.other.intellijContentBg, border: '1px solid var(--mantine-color-gray-3)', borderRadius: '4px', minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+								<PMTree
+									key={`descendants-${descendantsNodes.length}-${descendantsNodes.map(n => n.id).join('-')}`}
+									direction="descendants"
+									rootNodes={descendantsNodes}
+									showReset
+									showTreeFilters
+									showDirection
+									filterConfig={{
+										nodeTypes: NODE_TYPES,
+										showIncomingAssociations: false,
+										showOutgoingAssociations: false,
+									}}
+									clickHandlers={{
+										onSelect: handleDescendantSelection
+									}}
+								/>
+							</Box>
+						</>
 					</Box>
 				)}
 
-				{/* Associations Tabs */}
+				{/* Associations Section */}
 				{(() => {
 					const nodeType = props.rootNode.type;
 					const canHaveIncoming = nodeType === NodeType.O || nodeType === NodeType.OA || nodeType === NodeType.UA;
@@ -517,47 +573,241 @@ export function InfoPanel(props: InfoPanelProps) {
 						<Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 							<Group gap="xs" align="center" mb={8}>
 								<Text size="md" fw={600}>Associations</Text>
-								{canHaveIncoming && (
+								{!inlineAssoc && canHaveIncoming && (
 									<Tooltip label="Create INCOMING association">
 										<Button size="xs" variant="filled" color={theme.colors.green[9]} leftSection={<IconPlus size={20} />} rightSection={<IncomingAssociationIcon size="20px" />} onClick={() => handleStartAssociation(AssociationDirection.Incoming)} />
 									</Tooltip>
 								)}
-								{canHaveOutgoing && (
+								{!inlineAssoc && canHaveOutgoing && (
 									<Tooltip label="Create OUTGOING association">
 										<Button size="xs" variant="filled" color={theme.colors.green[9]} leftSection={<IconPlus size={20} />} rightSection={<OutgoingAssociationIcon size="20px" />} onClick={() => handleStartAssociation(AssociationDirection.Outgoing)} />
 									</Tooltip>
 								)}
 							</Group>
-							<Box
-								style={{
+
+							{inlineAssoc ? (
+								/* Inline create form */
+								<Box style={{
 									flex: 1,
 									minHeight: 0,
+									display: 'flex',
+									flexDirection: 'column',
 									border: '1px solid var(--mantine-color-gray-3)',
 									borderRadius: '4px',
-									display: 'flex',
-									minWidth: 0,
-									height: '100%',
 									overflow: 'hidden',
-									backgroundColor: theme.other.intellijContentBg
-								}}
-							>
-								<Box style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-									{showAssociationEmptyState ? (
-										<Alert variant="light" color="gray" p="xs">
-											<Text size="xs" c="dimmed">No associations</Text>
-										</Alert>
-									) : (
-										<PMTree {...associationTreeProps} />
-									)}
+									backgroundColor: 'var(--mantine-color-gray-0)',
+								}}>
+									<Box style={{ padding: '8px 12px', flexShrink: 0 }}>
+										{/* Source */}
+										<Box mb={8}>
+											<Text size="xs" c="dimmed" mb={4}>Source</Text>
+											{inlineAssoc.direction === AssociationDirection.Outgoing ? (
+												/* Root node is the source (fixed) */
+												<Group gap="xs">
+													<NodeIcon type={props.rootNode.type} size={24} />
+													<Text size="sm" fw={500}>{props.rootNode.name}</Text>
+												</Group>
+											) : (
+												/* Other node is the source (to be picked) */
+												<Popover
+													opened={inlineAssoc.isPicking}
+													onClose={handleClosePicker}
+													position="bottom-start"
+													width={520}
+													withArrow
+													shadow="md"
+												>
+													<Popover.Target>
+														<Box style={{ display: 'inline-block' }}>
+															{inlineAssoc.otherNode ? (
+																<Group gap="xs">
+																	<NodeIcon type={inlineAssoc.otherNode.type} size={24} />
+																	<Text size="sm" fw={500}>{inlineAssoc.otherNode.name}</Text>
+																	<ActionIcon size="sm" variant="subtle" onClick={handleOpenPicker} title="Change">
+																		<IconEdit size={18} />
+																	</ActionIcon>
+																</Group>
+															) : (
+																<Button size="xs" variant="outline" onClick={handleOpenPicker}>
+																	Set Source
+																</Button>
+															)}
+														</Box>
+													</Popover.Target>
+													<Popover.Dropdown style={{ padding: 0, height: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid var(--mantine-primary-color-filled)', borderRadius: '6px' }}>
+														<Group px="sm" py={8} style={{ flexShrink: 0, backgroundColor: 'var(--mantine-primary-color-0)', borderBottom: '1px solid var(--mantine-primary-color-3)' }}>
+															<Text size="xs" fw={700} c="var(--mantine-primary-color-filled)">Select Source Node</Text>
+														</Group>
+														<Box style={{ flex: 1, minHeight: 0 }}>
+															<PMTree
+																direction="ascendants"
+																showReset
+																showTreeFilters={false}
+																showDirection={false}
+																showCreatePolicyClass={false}
+																filterConfig={{
+																	nodeTypes: [NodeType.PC, NodeType.UA],
+																	showIncomingAssociations: false,
+																	showOutgoingAssociations: false,
+																}}
+																clickHandlers={{ onSelect: handlePickerNodeSelect }}
+															/>
+														</Box>
+														<Group gap="xs" p="xs" style={{ flexShrink: 0, borderTop: '1px solid var(--mantine-color-gray-2)', borderBottom: '1px solid var(--mantine-color-gray-2)', minHeight: 32 }}>
+															{inlineAssoc.pickingNode ? (
+																<>
+																	<NodeIcon type={inlineAssoc.pickingNode.type} size={18} />
+																	<Text size="xs" fw={500} style={{ flex: 1 }}>{inlineAssoc.pickingNode.name}</Text>
+																</>
+															) : (
+																<Text size="xs" c="dimmed">No node selected</Text>
+															)}
+														</Group>
+														<Group justify="flex-end" gap="xs" p="xs" style={{ flexShrink: 0 }}>
+															<Button size="xs" variant="subtle" color="gray" onClick={handleClosePicker}>Cancel</Button>
+															<Button size="xs" disabled={!inlineAssoc.pickingNode} onClick={handleConfirmPicker}>Set</Button>
+														</Group>
+													</Popover.Dropdown>
+												</Popover>
+											)}
+										</Box>
+
+										{/* Target */}
+										<Box mb={8}>
+											<Text size="xs" c="dimmed" mb={4}>Target</Text>
+											{inlineAssoc.direction === AssociationDirection.Incoming ? (
+												/* Root node is the target (fixed) */
+												<Group gap="xs">
+													<NodeIcon type={props.rootNode.type} size={24} />
+													<Text size="sm" fw={500}>{props.rootNode.name}</Text>
+												</Group>
+											) : (
+												/* Other node is the target (to be picked) */
+												<Popover
+													opened={inlineAssoc.isPicking}
+													onClose={handleClosePicker}
+													position="bottom-start"
+													width={520}
+													withArrow
+													shadow="md"
+												>
+													<Popover.Target>
+														<Box style={{ display: 'inline-block' }}>
+															{inlineAssoc.otherNode ? (
+																<Group gap="xs">
+																	<NodeIcon type={inlineAssoc.otherNode.type} size={24} />
+																	<Text size="sm" fw={500}>{inlineAssoc.otherNode.name}</Text>
+																	<ActionIcon size="sm" variant="subtle" onClick={handleOpenPicker} title="Change">
+																		<IconEdit size={18} />
+																	</ActionIcon>
+																</Group>
+															) : (
+																<Button size="xs" variant="outline" onClick={handleOpenPicker}>
+																	Set Target
+																</Button>
+															)}
+														</Box>
+													</Popover.Target>
+													<Popover.Dropdown style={{ padding: 0, height: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '2px solid var(--mantine-primary-color-filled)', borderRadius: '6px' }}>
+														<Group px="sm" py={8} style={{ flexShrink: 0, backgroundColor: 'var(--mantine-primary-color-0)', borderBottom: '1px solid var(--mantine-primary-color-3)' }}>
+															<Text size="xs" fw={700} c="var(--mantine-primary-color-filled)">Select Target Node</Text>
+														</Group>
+														<Box style={{ flex: 1, minHeight: 0 }}>
+															<PMTree
+																direction="ascendants"
+																showReset
+																showTreeFilters={false}
+																showDirection={false}
+																showCreatePolicyClass={false}
+																filterConfig={{
+																	nodeTypes: [NodeType.PC, NodeType.OA, NodeType.UA, NodeType.O],
+																	showIncomingAssociations: false,
+																	showOutgoingAssociations: false,
+																}}
+																clickHandlers={{ onSelect: handlePickerNodeSelect }}
+															/>
+														</Box>
+														<Group gap="xs" p="xs" style={{ flexShrink: 0, borderTop: '1px solid var(--mantine-color-gray-2)', borderBottom: '1px solid var(--mantine-color-gray-2)', minHeight: 32 }}>
+															{inlineAssoc.pickingNode ? (
+																<>
+																	<NodeIcon type={inlineAssoc.pickingNode.type} size={18} />
+																	<Text size="xs" fw={500} style={{ flex: 1 }}>{inlineAssoc.pickingNode.name}</Text>
+																</>
+															) : (
+																<Text size="xs" c="dimmed">No node selected</Text>
+															)}
+														</Group>
+														<Group justify="flex-end" gap="xs" p="xs" style={{ flexShrink: 0 }}>
+															<Button size="xs" variant="subtle" color="gray" onClick={handleClosePicker}>Cancel</Button>
+															<Button size="xs" disabled={!inlineAssoc.pickingNode} onClick={handleConfirmPicker}>Set</Button>
+														</Group>
+													</Popover.Dropdown>
+												</Popover>
+											)}
+										</Box>
+									</Box>
+
+									{/* Access Rights Tree */}
+									<Box style={{
+										flex: 1,
+										minHeight: 0,
+										display: 'flex',
+										flexDirection: 'column',
+										borderTop: '1px solid var(--mantine-color-gray-3)',
+									}}>
+										<AccessRightsTree
+											availableRights={resourceOperations}
+											selectedRights={inlineAssoc.selectedRights}
+											onChange={(rights) => setInlineAssoc(prev => prev ? { ...prev, selectedRights: rights } : null)}
+											disabled={!inlineAssoc.otherNode}
+										/>
+									</Box>
+
+									{/* Form action buttons */}
+									<Group justify="center" gap="xs" p={8} style={{ flexShrink: 0, borderTop: '1px solid var(--mantine-color-gray-2)' }}>
+										<Button size="xs" variant="outline" color="gray" onClick={handleCancelInlineAssoc}>Cancel</Button>
+										<Button
+											size="xs"
+											disabled={!inlineAssoc.otherNode || inlineAssoc.selectedRights.length === 0}
+											onClick={handleSubmitInlineAssoc}
+										>
+											Associate
+										</Button>
+									</Group>
 								</Box>
-							</Box>
+							) : (
+								/* Normal associations tree */
+								<Box
+									style={{
+										flex: 1,
+										minHeight: 0,
+										border: '1px solid var(--mantine-color-gray-3)',
+										borderRadius: '4px',
+										display: 'flex',
+										minWidth: 0,
+										height: '100%',
+										overflow: 'hidden',
+										backgroundColor: theme.other.intellijContentBg
+									}}
+								>
+									<Box style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+										{showAssociationEmptyState ? (
+											<Alert variant="light" color="gray" p="xs">
+												<Text size="xs" c="dimmed">No associations</Text>
+											</Alert>
+										) : (
+											<PMTree {...associationTreeProps} />
+										)}
+									</Box>
+								</Box>
+							)}
 						</Box>
 					);
             })()}
 			</Box>
 
-			{/* Association Modal (Create/Edit) */}
-			{isAssociationModalOpen && associationDirection && (
+	{/* Association Modal (Edit only) */}
+			{isAssociationModalOpen && associationDirection && editingAssociationNode && (
 				<AssociationModal
 					opened={isAssociationModalOpen}
 					onClose={handleCloseAssociationModal}
@@ -565,8 +815,8 @@ export function InfoPanel(props: InfoPanelProps) {
 					onSubmit={handleSubmitAssociation}
 					onDelete={handleDeleteAssociation}
 					resourceOperations={resourceOperations}
-					mode={associationModalMode}
-					associationNode={editingAssociationNode || undefined}
+					mode="edit"
+					associationNode={editingAssociationNode}
 					rootNode={props.rootNode}
 				/>
 			)}

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import {Box, Checkbox, Collapse, ScrollArea, Text, UnstyledButton, useMantineTheme} from "@mantine/core";
 import { IconChevronRight, IconChevronDown } from "@tabler/icons-react";
 
-class AccessRight {
+export class AccessRight {
 	ar: string;
 	children?: AccessRight[];
 
@@ -13,7 +13,7 @@ class AccessRight {
 }
 
 // Get all access right strings in the tree (including non-leaf nodes)
-function getAllAccessRights(node: AccessRight): string[] {
+export function getAllAccessRights(node: AccessRight): string[] {
 	const rights = [node.ar];
 	if (node.children) {
 		node.children.forEach(child => {
@@ -24,7 +24,7 @@ function getAllAccessRights(node: AccessRight): string[] {
 }
 
 // Get all ARs that have children (for default expanded state)
-function getAllExpandableRights(node: AccessRight): string[] {
+export function getAllExpandableRights(node: AccessRight): string[] {
 	const result: string[] = [];
 	if (node.children && node.children.length > 0) {
 		result.push(node.ar);
@@ -36,7 +36,7 @@ function getAllExpandableRights(node: AccessRight): string[] {
 }
 
 // Check if any ancestor of the target is selected
-function isAncestorSelected(targetAr: string, node: AccessRight, selectedRights: string[]): boolean {
+export function isAncestorSelected(targetAr: string, node: AccessRight, selectedRights: string[]): boolean {
 	if (!node.children) {return false;}
 
 	for (const child of node.children) {
@@ -62,7 +62,7 @@ function containsNode(targetAr: string, node: AccessRight): boolean {
 }
 
 // Find the selected ancestor of a node
-function findSelectedAncestor(targetAr: string, node: AccessRight, selectedRights: string[], path: AccessRight[] = []): AccessRight | null {
+export function findSelectedAncestor(targetAr: string, node: AccessRight, selectedRights: string[], path: AccessRight[] = []): AccessRight | null {
 	if (node.ar === targetAr) {
 		// Found target, return the most recent selected ancestor in path
 		for (let i = path.length - 1; i >= 0; i--) {
@@ -84,7 +84,7 @@ function findSelectedAncestor(targetAr: string, node: AccessRight, selectedRight
 
 // Consolidate selections: if all children of a parent are selected, replace with parent
 // This works recursively from bottom up
-function consolidateSelections(root: AccessRight, selectedRights: string[]): string[] {
+export function consolidateSelections(root: AccessRight, selectedRights: string[]): string[] {
 	let result = [...selectedRights];
 
 	function consolidateNode(node: AccessRight): boolean {

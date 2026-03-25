@@ -1,4 +1,4 @@
-import { AssociationDirection, sortTreeNodes, transformNodesToTreeNodes, TreeNode } from "@/features/pmtree/tree-utils";
+import { AssociationDirection, sortTreeNodes, transformNodeToTreeNode, TreeNode } from "@/features/pmtree/tree-utils";
 import * as QueryService from '@/shared/api/pdp_query.api';
 import { TreeDirection, TreeFilterConfig } from './hooks/usePMTreeOperations';
 
@@ -29,17 +29,19 @@ export const fetchNodeChildren = async (
         ? await QueryService.selfComputeAdjacentDescendantPrivileges(parentPmId)
         : await QueryService.selfComputeAdjacentAscendantPrivileges(parentPmId);
 
-    // Extract and filter nodes
-    let nodes = response
-        .map(nodePriv => nodePriv.node)
-        .filter((node): node is NonNullable<typeof node> => node !== undefined);
+    // Extract and filter node privilege info
+    let nodePrivileges = response.filter(np => np.node !== undefined);
 
     // Apply node type filter from filterConfig
     if (filterConfig?.nodeTypes && filterConfig.nodeTypes.length > 0) {
-      nodes = nodes.filter(node => filterConfig.nodeTypes.includes(node.type));
+      nodePrivileges = nodePrivileges.filter(np => filterConfig.nodeTypes.includes(np.node!.type));
     }
 
-    return transformNodesToTreeNodes(nodes, parentNodeId);
+    const treeNodes = nodePrivileges.map(np => ({
+      ...transformNodeToTreeNode(np.node!, parentNodeId),
+      privileges: np.accessRights,
+    }));
+    return sortTreeNodes(treeNodes);
   } catch (error) {
     console.error('Failed to fetch regular children:', error);
     // Re-throw the error so parent components can handle it

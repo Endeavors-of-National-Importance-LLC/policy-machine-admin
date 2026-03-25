@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	IconBan,
 	IconCopy,
+	IconHome,
 	IconInfoSquareRounded,
 	IconPlus,
+	IconShieldCheck,
 	IconTrash,
 } from '@tabler/icons-react';
 import { NodeApi } from 'react-arborist';
@@ -23,21 +25,30 @@ import { OutgoingAssociationIcon, NodeIcon, TreeNode } from '@/features/pmtree/t
 import { RightPanel, RightPanelComponent, Tab, TOOLBAR_CONFIG } from '@/pages/dashboard/RightPanel';
 import { NodeType } from '@/shared/api/pdp.types';
 import * as AdjudicationService from '@/shared/api/pdp_adjudication.api';
+import * as QueryService from '@/shared/api/pdp_query.api';
+import { AccessRightsTree } from '@/components/access-rights';
 
 export function Dashboard() {
 	const theme = useMantineTheme();
 
 	// Tab state
-	const [tabs, setTabs] = useState<Tab[]>(() =>
-		TOOLBAR_CONFIG.map((c) => ({
+	const [tabs, setTabs] = useState<Tab[]>(() => [
+		{
+			id: RightPanelComponent.WELCOME,
+			label: 'Welcome',
+			icon: <IconHome size={18} />,
+			component: RightPanelComponent.WELCOME,
+			permanent: true,
+		},
+		...TOOLBAR_CONFIG.map((c) => ({
 			id: c.comp,
 			label: c.label,
 			icon: c.tabIcon,
 			component: c.comp,
 			permanent: true,
-		}))
-	);
-	const [activeTabId, setActiveTabId] = useState<string | null>(RightPanelComponent.PROHIBITIONS);
+		})),
+	]);
+	const [activeTabId, setActiveTabId] = useState<string | null>(RightPanelComponent.WELCOME);
 
 	// Resize state
 	const [leftWidth, setLeftWidth] = useState<number>(() => {
@@ -56,6 +67,8 @@ export function Dashboard() {
 	const [createNodeModalOpened, setCreateNodeModalOpened] = useState(false);
 	const [nodeTypeToCreate, setNodeTypeToCreate] = useState<NodeType | null>(null);
 	const [newNodeName, setNewNodeName] = useState('');
+	const [privilegesModalOpened, setPrivilegesModalOpened] = useState(false);
+	const [resourceAccessRights, setResourceAccessRights] = useState<string[]>([]);
 
 	// Clamp leftWidth when container shrinks
 	useEffect(() => {
@@ -159,6 +172,17 @@ export function Dashboard() {
 			});
 		}
 		setContextMenuOpened(false);
+	};
+
+	const handleViewPrivileges = async () => {
+		setContextMenuOpened(false);
+		try {
+			const rights = await QueryService.getResourceAccessRights();
+			setResourceAccessRights(rights);
+		} catch {
+			setResourceAccessRights([]);
+		}
+		setPrivilegesModalOpened(true);
 	};
 
 	const handleCopyNodeName = () => {
@@ -363,6 +387,10 @@ export function Dashboard() {
 						Info
 					</Menu.Item>
 
+					<Menu.Item onClick={handleViewPrivileges} leftSection={<IconShieldCheck size={16} />}>
+						View Privileges
+					</Menu.Item>
+
 					<Menu.Item onClick={handleCopyNodeName} leftSection={<IconCopy size={16} />}>
 						Copy Node Name
 					</Menu.Item>
@@ -477,6 +505,25 @@ export function Dashboard() {
 						</Button>
 					</Group>
 				</Stack>
+			</Modal>
+
+			<Modal
+				opened={privilegesModalOpened}
+				onClose={() => setPrivilegesModalOpened(false)}
+				title={
+					<Group gap="sm">
+						<IconShieldCheck size={20} />
+						<Text size="lg" fw={600}>
+							Privileges — {rightClickedNode?.name}
+						</Text>
+					</Group>
+				}
+				>
+				<AccessRightsTree
+					availableRights={resourceAccessRights}
+					selectedRights={rightClickedNode?.privileges ?? []}
+					onChange={() => {}}
+				/>
 			</Modal>
 		</>
 	);

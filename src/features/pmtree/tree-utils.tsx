@@ -181,6 +181,7 @@ export interface TreeNode {
 	expanded?: boolean;
 	selected?: boolean;
 	isLoading?: boolean;
+	privileges?: string[];
 	isAssociation?: boolean;
 	associationDetails?: {
 		type: AssociationDirection

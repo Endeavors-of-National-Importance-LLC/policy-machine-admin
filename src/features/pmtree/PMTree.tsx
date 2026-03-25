@@ -6,6 +6,8 @@ import { Alert, Button, Center, Stack } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     INDENT_NUM,
+    sortTreeNodes,
+    transformNodeToTreeNode,
     transformNodesToTreeNodes,
     TreeNode,
 } from '@/features/pmtree/tree-utils';
@@ -117,12 +119,11 @@ export function PMTree(props: PMTreeProps) {
         try {
             // Only load POS if no rootNodes prop is provided
             const response = await withCriticalRetry(() => QueryService.selfComputePersonalObjectSystem());
-            // Extract nodes from the response and transform to TreeNode
-            const nodes = response
-                .map((nodePriv) => nodePriv.node)
-                .filter((node): node is NonNullable<typeof node> => node !== undefined);
-
-            const treeNodes = transformNodesToTreeNodes(nodes);
+            const treeNodes = sortTreeNodes(
+                response
+                    .filter(np => np.node !== undefined)
+                    .map(np => ({ ...transformNodeToTreeNode(np.node!), privileges: np.accessRights }))
+            );
             setPOSNodes(treeNodes);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';

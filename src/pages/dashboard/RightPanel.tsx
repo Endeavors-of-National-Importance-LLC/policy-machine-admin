@@ -12,8 +12,10 @@ import { QueryOperationIcon } from '@/components/icons/QueryOperationIcon';
 import { RoutineIcon } from '@/components/icons/RoutineIcon';
 import { FunctionIcon } from '@/components/icons/FunctionIcon';
 import { TreeNode } from '@/features/pmtree/tree-utils';
+import { WelcomePanel } from '@/features/welcome/WelcomePanel';
 
 export enum RightPanelComponent {
+	WELCOME = 'WELCOME',
 	NODE_INFO = 'NODE_INFO',
 	ASSOCIATION_INFO = 'ASSOCIATION_INFO',
 	PROHIBITIONS = 'PROHIBITIONS',
@@ -233,6 +235,8 @@ function renderTabContent(
 		return <InfoPanel rootNode={tab.nodeInfo} onClose={onClose} />;
 	}
 	switch (tab.component) {
+		case RightPanelComponent.WELCOME:
+			return <WelcomePanel />;
 		case RightPanelComponent.ASSOCIATION_INFO:
 			return tab.nodeInfo ? (
 				<AssociationInfoPanel associationNode={tab.nodeInfo} onClose={onClose} />

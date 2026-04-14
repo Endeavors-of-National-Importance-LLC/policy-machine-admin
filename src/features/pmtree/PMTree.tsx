@@ -150,7 +150,8 @@ export function PMTree(props: PMTreeProps) {
             ? posNodes.filter(n => activeFilterConfig.nodeTypes.includes(n.type as NodeType))
             : posNodes;
         setTreeData(filtered);
-    }, [posNodes, activeFilterConfig, props.rootNodes, setTreeData]);
+        treeApi?.closeAll();
+    }, [posNodes, activeFilterConfig, props.rootNodes, setTreeData, treeApi]);
 
     useEffect(() => {
         // Update tree data when rootNodes prop changes

@@ -570,6 +570,8 @@ export function InfoPanel(props: InfoPanelProps) {
 					if (!showAssociations) {return null;}
 
 					return (
+						<>
+						<Divider orientation="horizontal" />
 						<Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 							<Group gap="xs" align="center" mb={8}>
 								<Text size="md" fw={600}>Associations</Text>
@@ -802,6 +804,7 @@ export function InfoPanel(props: InfoPanelProps) {
 								</Box>
 							)}
 						</Box>
+						</>
 					);
             })()}
 			</Box>

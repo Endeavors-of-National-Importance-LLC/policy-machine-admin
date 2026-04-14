@@ -4,12 +4,17 @@ import {
 	IconCopy,
 	IconHome,
 	IconInfoSquareRounded,
+	IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftCollapseFilled,
+	IconLayoutSidebarLeftExpand, IconLayoutSidebarLeftExpandFilled,
+	IconLayoutSidebarRightCollapse, IconLayoutSidebarRightCollapseFilled,
+	IconLayoutSidebarRightExpand, IconLayoutSidebarRightExpandFilled,
 	IconPlus,
 	IconShieldCheck,
 	IconTrash,
 } from '@tabler/icons-react';
 import { NodeApi } from 'react-arborist';
 import {
+	ActionIcon,
 	Button,
 	Group,
 	Menu,
@@ -17,6 +22,7 @@ import {
 	Stack,
 	Text,
 	TextInput,
+	Tooltip,
 	useMantineTheme,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -55,9 +61,23 @@ export function Dashboard() {
 		const s = localStorage.getItem('dashboard-left-width');
 		return s ? parseInt(s, 10) : 320;
 	});
+	const [uaTreeWidth, setUaTreeWidth] = useState<number>(() => {
+		const s = localStorage.getItem('dashboard-ua-tree-width');
+		return s ? parseInt(s, 10) : 280;
+	});
 	const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
 	const dividerRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const uaDividerRef = useRef<HTMLDivElement>(null);
+	const uaDragState = useRef<{ startX: number; startWidth: number } | null>(null);
+
+	// Collapse state
+	const [uaTreeCollapsed, setUaTreeCollapsed] = useState<boolean>(() =>
+		localStorage.getItem('dashboard-ua-tree-collapsed') === 'true'
+	);
+	const [rightPanelCollapsed, setRightPanelCollapsed] = useState<boolean>(() =>
+		localStorage.getItem('dashboard-right-panel-collapsed') === 'true'
+	);
 
 	// Other state
 	const [contextMenuOpened, setContextMenuOpened] = useState(false);
@@ -86,6 +106,12 @@ export function Dashboard() {
 		nodeTypes: [NodeType.PC, NodeType.UA, NodeType.OA, NodeType.U, NodeType.O],
 		showOutgoingAssociations: false,
 		showIncomingAssociations: true,
+	}), []);
+
+	const uaTreeFilters = useMemo<TreeFilterConfig>(() => ({
+		nodeTypes: [NodeType.PC, NodeType.UA],
+		showOutgoingAssociations: true,
+		showIncomingAssociations: false,
 	}), []);
 
 	// Tab management
@@ -139,6 +165,55 @@ export function Dashboard() {
 		);
 		localStorage.setItem('dashboard-left-width', String(finalW));
 		dragState.current = null;
+	}, []);
+
+	// UA tree drag handlers
+	const handleUaDividerPointerDown = useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			e.preventDefault();
+			uaDividerRef.current?.setPointerCapture(e.pointerId);
+			uaDragState.current = { startX: e.clientX, startWidth: uaTreeWidth };
+		},
+		[uaTreeWidth]
+	);
+
+	const handleUaDividerPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		if (!uaDragState.current) return;
+		const containerW = containerRef.current?.offsetWidth ?? Infinity;
+		const newW = Math.min(
+			Math.max(150, uaDragState.current.startWidth + e.clientX - uaDragState.current.startX),
+			containerW - leftWidth - 324 - 8,
+		);
+		setUaTreeWidth(newW);
+	}, [leftWidth]);
+
+	const handleUaDividerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		if (!uaDragState.current) return;
+		const containerW = containerRef.current?.offsetWidth ?? Infinity;
+		const finalW = Math.min(
+			Math.max(150, uaDragState.current.startWidth + e.clientX - uaDragState.current.startX),
+			containerW - leftWidth - 324 - 8,
+		);
+		localStorage.setItem('dashboard-ua-tree-width', String(finalW));
+		uaDragState.current = null;
+	}, [leftWidth]);
+
+	// Collapse helpers
+	const collapseUaTree = useCallback(() => {
+		setUaTreeCollapsed(true);
+		localStorage.setItem('dashboard-ua-tree-collapsed', 'true');
+	}, []);
+	const expandUaTree = useCallback(() => {
+		setUaTreeCollapsed(false);
+		localStorage.setItem('dashboard-ua-tree-collapsed', 'false');
+	}, []);
+	const collapseRight = useCallback(() => {
+		setRightPanelCollapsed(true);
+		localStorage.setItem('dashboard-right-panel-collapsed', 'true');
+	}, []);
+	const expandRight = useCallback(() => {
+		setRightPanelCollapsed(false);
+		localStorage.setItem('dashboard-right-panel-collapsed', 'false');
 	}, []);
 
 	// Event handlers
@@ -309,14 +384,54 @@ export function Dashboard() {
 				ref={containerRef}
 				style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}
 			>
-				{/* Left panel — PMTree full height */}
+				{/* UA Tree panel */}
 				<div
 					style={{
-						width: leftWidth,
+						width: uaTreeCollapsed ? 0 : uaTreeWidth,
+						flexShrink: 0,
+						height: '100%',
+						overflow: 'hidden',
+						backgroundColor: theme.other.intellijPanelBg as string,
+					}}
+				>
+					<PMTree
+						style={{ width: uaTreeWidth, height: '100%' }}
+						direction="ascendants"
+						filterConfig={uaTreeFilters}
+						showTreeFilters={false}
+						showDirection={false}
+						showCreatePolicyClass={false}
+					/>
+				</div>
+
+				{/* UA ↔ Main drag divider */}
+				{!uaTreeCollapsed && (
+					<div
+						ref={uaDividerRef}
+						onPointerDown={handleUaDividerPointerDown}
+						onPointerMove={handleUaDividerPointerMove}
+						onPointerUp={handleUaDividerPointerUp}
+						style={{
+							width: 4,
+							flexShrink: 0,
+							cursor: 'col-resize',
+							backgroundColor: theme.other.intellijDivider as string,
+							userSelect: 'none',
+							touchAction: 'none',
+						}}
+					/>
+				)}
+
+				{/* Main PMTree panel */}
+				<div
+					style={{
+						width: rightPanelCollapsed ? undefined : leftWidth,
+						flex: rightPanelCollapsed ? 1 : undefined,
 						flexShrink: 0,
 						minWidth: 150,
 						height: '100%',
 						overflow: 'hidden',
+						backgroundColor: theme.other.intellijContentBg as string,
 					}}
 				>
 					<PMTree
@@ -326,27 +441,47 @@ export function Dashboard() {
 						clickHandlers={{ onRightClick: handleNodeRightClick, onSelect: handleSelect }}
 						showCreatePolicyClass
 						onCreatePolicyClass={() => handleCreateNodeClick(NodeType.PC)}
+						rightToolbarSection={
+							<>
+								<Tooltip label={uaTreeCollapsed ? 'Expand UA Tree' : 'Collapse UA Tree'} position="bottom">
+									<ActionIcon variant="subtle" onClick={uaTreeCollapsed ? expandUaTree : collapseUaTree}>
+										{uaTreeCollapsed
+											? <IconLayoutSidebarLeftExpandFilled size={28} />
+											: <IconLayoutSidebarLeftCollapse size={28} />}
+									</ActionIcon>
+								</Tooltip>
+								<Tooltip label={rightPanelCollapsed ? 'Expand Right Panel' : 'Collapse Right Panel'} position="bottom">
+									<ActionIcon variant="subtle" onClick={rightPanelCollapsed ? expandRight : collapseRight}>
+										{rightPanelCollapsed
+											? <IconLayoutSidebarRightExpandFilled size={28} />
+											: <IconLayoutSidebarRightCollapse size={28} />}
+									</ActionIcon>
+								</Tooltip>
+							</>
+						}
 					/>
 				</div>
 
-				{/* Drag divider */}
-				<div
-					ref={dividerRef}
-					onPointerDown={handleDividerPointerDown}
-					onPointerMove={handleDividerPointerMove}
-					onPointerUp={handleDividerPointerUp}
-					style={{
-						width: 4,
-						flexShrink: 0,
-						cursor: 'col-resize',
-						backgroundColor: 'var(--mantine-color-gray-3)',
-						userSelect: 'none',
-						touchAction: 'none',
-					}}
-				/>
+				{/* Main ↔ Right drag divider */}
+				{!rightPanelCollapsed && (
+					<div
+						ref={dividerRef}
+						onPointerDown={handleDividerPointerDown}
+						onPointerMove={handleDividerPointerMove}
+						onPointerUp={handleDividerPointerUp}
+						style={{
+							width: 4,
+							flexShrink: 0,
+							cursor: 'col-resize',
+							backgroundColor: theme.other.intellijDivider as string,
+							userSelect: 'none',
+							touchAction: 'none',
+						}}
+					/>
+				)}
 
-				{/* Right panel — tab system */}
-				<div style={{ flex: 1, minWidth: 320, height: '100%', overflow: 'hidden' }}>
+				{/* Right panel */}
+				<div style={{ flex: rightPanelCollapsed ? 0 : 1, minWidth: 0, height: '100%', overflow: 'hidden', backgroundColor: theme.other.intellijPanelBg as string }}>
 					<RightPanel
 						tabs={tabs}
 						activeTabId={activeTabId}

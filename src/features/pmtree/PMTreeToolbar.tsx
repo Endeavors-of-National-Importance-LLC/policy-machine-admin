@@ -254,7 +254,8 @@ export function PMTreeToolbar({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid var(--mantine-color-gray-3)',
+                borderBottom: `1px solid ${theme.other.intellijDivider as string}`,
+                backgroundColor: theme.other.intellijToolbarBg as string,
                 padding: '2px 8px',
                 height: 60,
                 overflow: 'hidden',
@@ -270,11 +271,13 @@ export function PMTreeToolbar({
                             alignItems: 'center',
                         }}
                     >
-                        <ToolBarSection title="Reset">
-                            <ActionIcon variant="default" onClick={onReset}>
-                                <IconRefresh size={18} />
-                            </ActionIcon>
-                        </ToolBarSection>
+                        <div style={{ padding: '0 8px' }}>
+                            <ToolBarSection title="Reset">
+                                <ActionIcon variant="default" onClick={onReset}>
+                                    <IconRefresh size={18} />
+                                </ActionIcon>
+                            </ToolBarSection>
+                        </div>
                         <Divider orientation="vertical" />
                     </div>
                 )}
@@ -288,11 +291,13 @@ export function PMTreeToolbar({
                             alignItems: 'center',
                         }}
                     >
-                        <ToolBarSection title="Create Policy Class">
-                            <ActionIcon variant="default" size="md" onClick={onCreatePolicyClass}>
-                                <NodeIcon type={NodeType.PC} size={20} />
-                            </ActionIcon>
-                        </ToolBarSection>
+                        <div style={{ padding: '0 8px' }}>
+                            <ToolBarSection title="Create">
+                                <ActionIcon variant="default" size="md" onClick={onCreatePolicyClass}>
+                                    <NodeIcon type={NodeType.PC} size={20} />
+                                </ActionIcon>
+                            </ToolBarSection>
+                        </div>
                         <Divider orientation="vertical" />
                     </div>
                 )}
@@ -306,7 +311,9 @@ export function PMTreeToolbar({
                             alignItems: 'center',
                         }}
                     >
-                        {leftSection}
+                        <div style={{ padding: '0 8px' }}>
+                            {leftSection}
+                        </div>
                         <Divider orientation="vertical" />
                     </div>
                 )}
@@ -320,7 +327,9 @@ export function PMTreeToolbar({
                             alignItems: 'center',
                         }}
                     >
-                        <TreeFilterToolbar filters={filters} onFiltersChange={onFiltersChange} />
+                        <div style={{ padding: '0 8px' }}>
+                            <TreeFilterToolbar filters={filters} onFiltersChange={onFiltersChange} />
+                        </div>
                         <Divider orientation="vertical" />
                     </div>
                 )}
@@ -334,16 +343,18 @@ export function PMTreeToolbar({
                             alignItems: 'center',
                         }}
                     >
-                        <ToolBarSection title="Direction">
-                            <Group gap={0}>
-                                {direction === 'ascendants' ? (
-                                    <IconCircleArrowUpRight />
-                                ) : (
-                                    <IconCircleArrowDownLeft />
-                                )}
-                                <Text size="xs">{directionLabel}</Text>
-                            </Group>
-                        </ToolBarSection>
+                        <div style={{ padding: '0 8px' }}>
+                            <ToolBarSection title="Direction">
+                                <Group gap={0}>
+                                    {direction === 'ascendants' ? (
+                                        <IconCircleArrowUpRight />
+                                    ) : (
+                                        <IconCircleArrowDownLeft />
+                                    )}
+                                    <Text size="xs">{directionLabel}</Text>
+                                </Group>
+                            </ToolBarSection>
+                        </div>
                     </div>
                 )}
 

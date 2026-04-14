@@ -1,6 +1,7 @@
 import React from 'react';
-import { Badge, Divider, List, Stack, Text, Title } from '@mantine/core';
+import { Divider, List, Stack, Text, Title, useMantineTheme } from '@mantine/core';
 import pmIcon from '@/assets/pm-icon.svg';
+import { NodeIcon } from '@/features/pmtree/tree-utils';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
 	return (
@@ -44,44 +45,40 @@ function CodeBlock({ children }: { children: string }) {
 
 const NODE_TYPES = [
 	{
-		label: 'PC',
+		type: 'PC',
 		name: 'Policy Class',
-		color: 'green',
 		desc: 'Root container for a policy domain. All other nodes belong to at least one PC. You can create multiple PCs to model independent or overlapping access domains.',
 	},
 	{
-		label: 'UA',
+		type: 'UA',
 		name: 'User Attribute',
-		color: 'red',
 		desc: 'Represents a group, role, or category of users. UAs can be nested inside other UAs or a PC, forming a user hierarchy. Associations always originate from a UA.',
 	},
 	{
-		label: 'OA',
+		type: 'OA',
 		name: 'Object Attribute',
-		color: 'blue',
 		desc: 'Represents a group or category of resources. OAs can be nested inside other OAs or a PC. Associations always target an OA (or O/UA in some configurations).',
 	},
 	{
-		label: 'U',
+		type: 'U',
 		name: 'User',
-		color: 'pink',
 		desc: 'A concrete individual user. Users are leaf nodes and must be assigned to at least one UA. They cannot contain other nodes.',
 	},
 	{
-		label: 'O',
+		type: 'O',
 		name: 'Object',
-		color: 'indigo',
 		desc: 'A concrete resource or data object. Objects are leaf nodes and must be assigned to at least one OA. They cannot contain other nodes.',
 	},
 ];
 
 export function WelcomePanel() {
+	const theme = useMantineTheme();
 	return (
 		<div
 			style={{
 				flex: 1,
 				overflowY: 'auto',
-				backgroundColor: 'var(--mantine-color-gray-0)',
+				backgroundColor: theme.other.intellijPanelBg as string,
 				display: 'flex',
 				justifyContent: 'center',
 				padding: '48px 24px',
@@ -104,8 +101,8 @@ export function WelcomePanel() {
 
 				<Divider />
 
-				{/* Policy Graph */}
-				<Section title="Policy Graph">
+				{/* Graph */}
+				<Section title="Graph">
 					<Text size="sm">
 						The left panel displays the full policy graph as an interactive tree. The graph is
 						composed of five node types that form a hierarchy. Right-click any node to open its
@@ -115,10 +112,8 @@ export function WelcomePanel() {
 					<SubSection title="Node Types">
 						<Stack gap="xs">
 							{NODE_TYPES.map((n) => (
-								<div key={n.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-									<Badge color={n.color} variant="filled" size="sm" style={{ flexShrink: 0, marginTop: 2 }}>
-										{n.label}
-									</Badge>
+								<div key={n.type} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+									<NodeIcon type={n.type} size={20} style={{ flexShrink: 0, marginTop: 1 }} />
 									<Text size="sm">
 										<Text span fw={600}>{n.name}</Text> — {n.desc}
 									</Text>

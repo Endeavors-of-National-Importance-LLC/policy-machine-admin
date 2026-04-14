@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionIcon, Menu, Tooltip } from '@mantine/core';
+import { ActionIcon, Menu, Tooltip, useMantineTheme } from '@mantine/core';
 import { IconBan, IconCalendarCode, IconDotsVertical, IconX } from '@tabler/icons-react';
 import { ProhibitionDetails, ProhibitionsPanel } from '@/features/prohibitions';
 import { ObligationsPanel } from '@/features/obligations/ObligationsPanel';
@@ -137,6 +137,7 @@ function TabItem({
 	onSwitch: (id: string) => void;
 	onClose: (id: string) => void;
 }) {
+	const theme = useMantineTheme();
 	return (
 		<Tooltip label={tab.label} position="bottom" openDelay={500} withinPortal>
 		<div
@@ -151,11 +152,13 @@ function TabItem({
 				paddingRight: 4,
 				gap: 4,
 				cursor: 'pointer',
-				backgroundColor: isActive ? 'white' : 'var(--mantine-color-gray-1)',
+				backgroundColor: isActive
+					? (theme.other.intellijPanelBg as string)
+					: (theme.other.intellijToolbarBg as string),
 				borderBottom: isActive
 					? '2px solid var(--mantine-primary-color-filled)'
 					: '2px solid transparent',
-				borderRight: '1px solid var(--mantine-color-gray-3)',
+				borderRight: `1px solid ${theme.other.intellijDivider as string}`,
 				userSelect: 'none',
 			}}
 		>
@@ -275,6 +278,7 @@ export function RightPanel({
 	onTabSwitch,
 	onTabClose,
 }: RightPanelProps) {
+	const theme = useMantineTheme();
 	const tabBarRef = useRef<HTMLDivElement>(null);
 	const [containerWidth, setContainerWidth] = useState(600);
 
@@ -311,7 +315,6 @@ export function RightPanel({
 				display: 'flex',
 				flexDirection: 'column',
 				height: '100%',
-				borderLeft: '1px solid var(--mantine-color-gray-3)',
 			}}
 		>
 			{/* Tab bar */}
@@ -319,8 +322,8 @@ export function RightPanel({
 				style={{
 					height: 42,
 					flexShrink: 0,
-					borderBottom: '1px solid var(--mantine-color-gray-3)',
-					backgroundColor: 'var(--mantine-color-gray-0)',
+					borderBottom: `1px solid ${theme.other.intellijDivider as string}`,
+					backgroundColor: theme.other.intellijToolbarBg as string,
 					display: 'flex',
 					overflow: 'hidden',
 				}}

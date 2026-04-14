@@ -64,7 +64,9 @@ export const lightTheme = createTheme({
   primaryShade: 6,
   other: {
     intellijContentBg: '#ffffff',
-    intellijPanelBg: '#fcfcfc',
+    intellijPanelBg: '#ffffff',
+    intellijToolbarBg: '#ffffff',
+    intellijDivider: '#d4d4d4',
   },
 });
 
@@ -78,8 +80,10 @@ export const darkTheme = createTheme({
   primaryColor: 'blue',
   primaryShade: 6,
   other: {
-    intellijContentBg: '#1e1e1e',  // VS Code Dark+ editor background
-    intellijPanelBg: '#252526',    // VS Code Dark+ sidebar/panel background
+    intellijContentBg: '#1e1f22',  // JetBrains Dark editor background
+    intellijPanelBg: '#2b2d30',    // JetBrains Dark sidebar/panel background
+    intellijToolbarBg: '#313438',  // JetBrains Dark toolbar background
+    intellijDivider: '#1e1f22',    // JetBrains Dark divider
   },
 });
 

@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconAlertCircle, IconRefresh } from '@tabler/icons-react';
 import { atom, useAtom } from 'jotai';
 import { NodeApi, NodeRendererProps, Tree, TreeApi } from 'react-arborist';
-import { Alert, Button, Center, Stack } from '@mantine/core';
+import { Alert, Button, Center, Group, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     INDENT_NUM,
+    NodeIcon,
     sortTreeNodes,
     transformNodeToTreeNode,
     transformNodesToTreeNodes,
@@ -57,6 +58,22 @@ export interface PMTreeProps {
     rightToolbarSection?: React.ReactNode;
 }
 
+function SelectedNodeLabel({ node }: { node: TreeNode | null }) {
+    return (
+        <div style={{ height: 24, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+            <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>Selected Node:</Text>
+            {node && (
+                <Group gap={4} wrap="nowrap" style={{ minWidth: 0 }}>
+                    <NodeIcon type={node.type as NodeType} size={18} style={{ flexShrink: 0 }} />
+                    <Text size="sm" truncate>
+                        {node.name}
+                    </Text>
+                </Group>
+            )}
+        </div>
+    );
+}
+
 export function PMTree(props: PMTreeProps) {
     // Create internal atoms for this PMTree instance
     const treeApiAtom = useMemo(() => atom<TreeApi<TreeNode> | null>(null), []);
@@ -78,6 +95,9 @@ export function PMTree(props: PMTreeProps) {
     // Initial data loading
     const [posNodes, setPOSNodes] = useState<TreeNode[]>([]);
     const [initialError, setInitialError] = useState<string | null>(null);
+
+    // Selected node tracking
+    const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
 
     // Internal filter state
     const [internalFilters, setInternalFiltersState] = useState<TreeFilterConfig>(
@@ -169,6 +189,15 @@ export function PMTree(props: PMTreeProps) {
             }
         },
         [setTreeApi]
+    );
+
+    // Wrap onSelect to track selected node internally
+    const handleSelect = useCallback(
+        (nodes: NodeApi<TreeNode>[]) => {
+            setSelectedNode(nodes.length === 1 ? nodes[0].data : null);
+            props.clickHandlers?.onSelect?.(nodes);
+        },
+        [props.clickHandlers]
     );
 
     // Internal nodeRenderer that creates PMNode with proper atoms and config
@@ -265,6 +294,7 @@ export function PMTree(props: PMTreeProps) {
                         minWidth: 0,
                     }}>
                         {internalToolbar}
+                        <SelectedNodeLabel node={selectedNode} />
                         <FillFlexParent>
                             {({ width, height }) => {
                                 // Show error state with retry option
@@ -305,7 +335,7 @@ export function PMTree(props: PMTreeProps) {
                                         indent={INDENT_NUM}
                                         rowHeight={props.rowHeight ?? 28}
                                         overscanCount={props.overscanCount ?? 20}
-                                        onSelect={props.clickHandlers?.onSelect}
+                                        onSelect={handleSelect}
                                         disableMultiSelection={props.disableMultiSelection ?? true}
                                     >
                                         {nodeRenderer}

@@ -40,6 +40,7 @@ type InlineAssocState = {
 export interface InfoPanelProps {
 	rootNode: TreeNode;
 	onClose?: () => void;
+	startAssociation?: { direction: AssociationDirection; otherNode: TreeNode; nonce: number };
 }
 
 export function InfoPanel(props: InfoPanelProps) {
@@ -75,6 +76,15 @@ export function InfoPanel(props: InfoPanelProps) {
 		setPickingAssignmentNode(null);
 		setInlineAssoc(null);
 	}, [props.rootNode.pmId]);
+
+	// Enter inline association creation mode when triggered from outside (e.g. context menu)
+	useEffect(() => {
+		if (!props.startAssociation) return;
+		const { direction, otherNode } = props.startAssociation;
+		setInlineAssoc({ direction, otherNode, selectedRights: [], pickingNode: null, isPicking: false });
+		setSelectedAssociationDirection(direction);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [props.startAssociation?.nonce]);
 
 	// Handle selection in descendants tree
 	const handleDescendantSelection = useCallback((nodeApi: any[]) => {

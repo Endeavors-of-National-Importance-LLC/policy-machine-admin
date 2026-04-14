@@ -27,7 +27,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { PMTree, TreeFilterConfig } from '@/features/pmtree';
-import { OutgoingAssociationIcon, NodeIcon, TreeNode } from '@/features/pmtree/tree-utils';
+import { OutgoingAssociationIcon, IncomingAssociationIcon, NodeIcon, TreeNode, AssociationDirection } from '@/features/pmtree/tree-utils';
 import { RightPanel, RightPanelComponent, Tab, TOOLBAR_CONFIG } from '@/pages/dashboard/RightPanel';
 import { NodeType } from '@/shared/api/pdp.types';
 import * as AdjudicationService from '@/shared/api/pdp_adjudication.api';
@@ -84,6 +84,7 @@ export function Dashboard() {
 	const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 	const [rightClickedNode, setRightClickedNode] = useState<TreeNode | null>(null);
 	const [selectedNodes, setSelectedNodes] = useState<TreeNode[]>([]);
+	const [selectedUANode, setSelectedUANode] = useState<TreeNode | null>(null);
 	const [createNodeModalOpened, setCreateNodeModalOpened] = useState(false);
 	const [nodeTypeToCreate, setNodeTypeToCreate] = useState<NodeType | null>(null);
 	const [newNodeName, setNewNodeName] = useState('');
@@ -116,7 +117,11 @@ export function Dashboard() {
 
 	// Tab management
 	const openTab = useCallback((tab: Tab) => {
-		setTabs((prev) => (prev.find((t) => t.id === tab.id) ? prev : [...prev, tab]));
+		setTabs((prev) => {
+			const existing = prev.find((t) => t.id === tab.id);
+			if (existing) return prev.map((t) => t.id === tab.id ? { ...t, ...tab } : t);
+			return [...prev, tab];
+		});
 		setActiveTabId(tab.id);
 	}, []);
 
@@ -215,6 +220,30 @@ export function Dashboard() {
 		setRightPanelCollapsed(false);
 		localStorage.setItem('dashboard-right-panel-collapsed', 'false');
 	}, []);
+
+	const handleUANodeSelect = useCallback((nodes: NodeApi<TreeNode>[]) => {
+		const node = nodes?.[0]?.data ?? null;
+		setSelectedUANode(node?.type === NodeType.UA ? node : null);
+	}, []);
+
+	const handleAssociateWithUANode = useCallback(() => {
+		if (!rightClickedNode || !selectedUANode || rightClickedNode.pmId == null) return;
+		setContextMenuOpened(false);
+		if (rightPanelCollapsed) expandRight();
+		const node = rightClickedNode;
+		openTab({
+			id: `node-info-${node.pmId}`,
+			label: node.name,
+			icon: <NodeIcon type={node.type as NodeType} size={18} />,
+			component: 'NODE_INFO',
+			nodeInfo: node,
+			startAssociation: {
+				direction: AssociationDirection.Incoming,
+				otherNode: selectedUANode,
+				nonce: Date.now(),
+			},
+		});
+	}, [rightClickedNode, selectedUANode, rightPanelCollapsed, expandRight, openTab]);
 
 	// Event handlers
 	const handleNodeRightClick = (node: TreeNode, event: React.MouseEvent) => {
@@ -401,6 +430,7 @@ export function Dashboard() {
 						showTreeFilters={false}
 						showDirection={false}
 						showCreatePolicyClass={false}
+						clickHandlers={{ onSelect: handleUANodeSelect }}
 					/>
 				</div>
 
@@ -521,6 +551,28 @@ export function Dashboard() {
 					>
 						Info
 					</Menu.Item>
+
+					{selectedUANode &&
+						rightClickedNode &&
+						(rightClickedNode.type === NodeType.UA || rightClickedNode.type === NodeType.OA) && (
+							<Menu.Item
+								onClick={handleAssociateWithUANode}
+								leftSection={<OutgoingAssociationIcon size="16px" color={theme.colors.green[9]} />}
+								style={{
+									backgroundColor: theme.colors.green[0],
+									borderLeft: `3px solid ${theme.colors.green[9]}`,
+								}}
+							>
+								<Group gap={6} wrap="nowrap">
+									Associate
+									<NodeIcon type={selectedUANode.type as NodeType} size={16} />
+									<Text span size="sm" fw={500}>{selectedUANode.name}</Text>
+									with
+									<NodeIcon type={rightClickedNode.type as NodeType} size={16} />
+									<Text span size="sm" fw={500}>{rightClickedNode.name}</Text>
+								</Group>
+							</Menu.Item>
+						)}
 
 					<Menu.Item onClick={handleViewPrivileges} leftSection={<IconShieldCheck size={16} />}>
 						View Privileges

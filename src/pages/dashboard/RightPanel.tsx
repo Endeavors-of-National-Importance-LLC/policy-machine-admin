@@ -11,7 +11,7 @@ import { ResourceOperationIcon } from '@/components/icons/ResourceOperationIcon'
 import { QueryOperationIcon } from '@/components/icons/QueryOperationIcon';
 import { RoutineIcon } from '@/components/icons/RoutineIcon';
 import { FunctionIcon } from '@/components/icons/FunctionIcon';
-import { TreeNode } from '@/features/pmtree/tree-utils';
+import { TreeNode, AssociationDirection } from '@/features/pmtree/tree-utils';
 import { WelcomePanel } from '@/features/welcome/WelcomePanel';
 
 export enum RightPanelComponent {
@@ -35,6 +35,7 @@ export type Tab = {
 	component: RightPanelComponent | 'NODE_INFO';
 	nodeInfo?: TreeNode;
 	permanent?: boolean;
+	startAssociation?: { direction: AssociationDirection; otherNode: TreeNode; nonce: number };
 };
 
 export type ToolbarEntry = {
@@ -235,7 +236,7 @@ function renderTabContent(
 	onClose: () => void
 ): React.ReactNode {
 	if (tab.component === 'NODE_INFO' && tab.nodeInfo) {
-		return <InfoPanel rootNode={tab.nodeInfo} onClose={onClose} />;
+		return <InfoPanel rootNode={tab.nodeInfo} onClose={onClose} startAssociation={tab.startAssociation} />;
 	}
 	switch (tab.component) {
 		case RightPanelComponent.WELCOME:

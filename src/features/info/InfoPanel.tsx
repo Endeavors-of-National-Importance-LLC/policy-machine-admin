@@ -12,8 +12,8 @@ import {ActionIcon, Alert, Box, Button, Divider, Group, Popover, Stack, Text, To
 import { notifications } from "@mantine/notifications";
 import { PMTree } from "@/features/pmtree";
 import { fetchAssociationChildren } from "@/features/pmtree/tree-data-fetcher";
-import { AssociationDirection, IncomingAssociationIcon, OutgoingAssociationIcon, NodeIcon, transformNodesToTreeNodes, TreeNode } from "@/features/pmtree/tree-utils";
-import { NODE_TYPES, NodePrivilegeInfo, NodeType } from "@/shared/api/pdp.types";
+import { AssociationDirection, IncomingAssociationIcon, OutgoingAssociationIcon, NodeIcon, sortTreeNodes, transformNodesToTreeNodes, TreeNode } from "@/features/pmtree/tree-utils";
+import { Node, NODE_TYPES, NodePrivilegeInfo, NodeType } from "@/shared/api/pdp.types";
 import * as QueryService from "@/shared/api/pdp_query.api";
 import * as AdjudicationService from "@/shared/api/pdp_adjudication.api";
 import { AssociationModal } from "./AssociationModal";
@@ -250,12 +250,34 @@ export function InfoPanel(props: InfoPanelProps) {
 		try {
 			await AdjudicationService.associate(sourcePmId, targetPmId, selectedRights);
 			notifications.show({ color: 'green', title: 'Association Created', message: `Created association with ${otherNode.name}` });
-			const refreshed = await fetchAssociationChildren(
-				props.rootNode.pmId,
-				{ nodeTypes: [NodeType.UA, NodeType.OA, NodeType.U, NodeType.O], showIncomingAssociations: true, showOutgoingAssociations: true },
-				props.rootNode.id
-			);
-			setAssociationRootNodes(refreshed);
+			const otherPmNode: Node = {
+				id: otherNodePmId,
+				name: otherNode.name,
+				type: otherNode.type as NodeType,
+				properties: {},
+			};
+			const rootPmNode: Node = {
+				id: rootPmId,
+				name: props.rootNode.name,
+				type: props.rootNode.type as NodeType,
+				properties: {},
+			};
+			const newAssocNode: TreeNode = {
+				id: crypto.randomUUID(),
+				pmId: otherNodePmId,
+				name: otherNode.name,
+				type: otherNode.type,
+				children: [],
+				parent: props.rootNode.id,
+				isAssociation: true,
+				associationDetails: {
+					type: direction,
+					accessRightSet: selectedRights,
+					ua: isOutgoing ? rootPmNode : otherPmNode,
+					target: isOutgoing ? otherPmNode : rootPmNode,
+				},
+			};
+			setAssociationRootNodes(prev => sortTreeNodes([...prev, newAssocNode]));
 			setInlineAssoc(null);
 		} catch (error) {
 			notifications.show({ color: 'red', title: 'Association Error', message: (error as Error).message });

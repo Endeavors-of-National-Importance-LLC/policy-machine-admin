@@ -174,11 +174,26 @@ export function PMTree(props: PMTreeProps) {
     }, [posNodes, activeFilterConfig, props.rootNodes, setTreeData, treeApi]);
 
     useEffect(() => {
-        // Update tree data when rootNodes prop changes
-        if (props.rootNodes !== undefined) {
-            setTreeData(props.rootNodes);
+        if (props.rootNodes === undefined) return;
+
+        let filteredNodes = props.rootNodes;
+
+        if (activeFilterConfig.nodeTypes.length > 0) {
+            filteredNodes = filteredNodes.filter(node =>
+                activeFilterConfig.nodeTypes.includes(node.type as NodeType)
+            );
         }
-    }, [props.rootNodes, setTreeData]);
+
+        filteredNodes = filteredNodes.filter(node => {
+            if (!node.isAssociation) return true;
+            const direction = node.associationDetails?.type;
+            if (direction === 'incoming' && !activeFilterConfig.showIncomingAssociations) return false;
+            if (direction === 'outgoing' && !activeFilterConfig.showOutgoingAssociations) return false;
+            return true;
+        });
+
+        setTreeData(filteredNodes);
+    }, [props.rootNodes, activeFilterConfig, setTreeData]);
 
     // Callback ref to handle TreeApi assignment
     const handleTreeApiRef = useCallback(
